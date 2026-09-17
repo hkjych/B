@@ -14,7 +14,7 @@ CLEAN_AD_REGEXES = [
 GROUP_NAMES = {f"{info['emoji']} {info['name']}" for info in REGIONS_DB.values()}
 GROUP_NAMES.add('🌍 其他地区')
 GROUP_NAMES.update([f"⚡ 自动选择 | {name}" for name in list(GROUP_NAMES)])
-GROUP_NAMES.update({'🚀 选择代理', '🗺️ 选择地区', '♻️ 自动选择', '🔰 延迟最低', '✅ 手动选择', 'DIRECT', 'REJECT', 'PASS'})
+GROUP_NAMES.update({'🚀 选择代理', '🗺️ 选择地区', '♻️ 自动选择', '🔰 延迟最低', '✅ 手动选择', '📢 订阅信息', 'DIRECT', 'REJECT', 'PASS'})
 
 # 无效与回环 server 过滤黑名单
 INVALID_SERVERS = {

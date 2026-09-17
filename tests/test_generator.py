@@ -15,7 +15,8 @@ class TestGenerator(unittest.TestCase):
                 {"name": "🗺️ 选择地区", "type": "select", "proxies": []},
                 {"name": "♻️ 自动选择", "type": "fallback", "proxies": []},
                 {"name": "🔰 延迟最低", "type": "url-test", "proxies": []},
-                {"name": "✅ 手动选择", "type": "select", "proxies": []}
+                {"name": "✅ 手动选择", "type": "select", "proxies": []},
+                {"name": "📢 订阅信息", "type": "select", "proxies": []}
             ],
             "rules": ["MATCH,🚀 选择代理"]
         }
@@ -52,6 +53,7 @@ class TestGenerator(unittest.TestCase):
             auto_proxies = groups["♻️ 自动选择"]["proxies"]
             for p in auto_proxies:
                 self.assertFalse(p.startswith("🇨🇳"))
+                self.assertFalse("⚠️" in p)
 
             # 2. 验证瑞士是否独立建组 (count > 0)
             region_menu = groups["🗺️ 选择地区"]["proxies"]
@@ -61,6 +63,16 @@ class TestGenerator(unittest.TestCase):
             nl_group = groups.get("⚡ 自动选择 | 🇳🇱 荷兰")
             self.assertIsNotNone(nl_group)
             self.assertEqual(nl_group["type"], "fallback")
+
+            # 4. 验证 📢 订阅信息 组存在且包含 5 个提示节点
+            info_group = groups.get("📢 订阅信息")
+            self.assertIsNotNone(info_group)
+            self.assertEqual(len(info_group["proxies"]), 5)
+            self.assertTrue(any("⚠️" in p for p in info_group["proxies"]))
+
+            # 5. 验证 ✅ 手动选择 前 5 个为信息节点
+            manual_proxies = groups["✅ 手动选择"]["proxies"]
+            self.assertTrue("⚠️ 本组仅作展示·请勿选择" in manual_proxies[0])
 
 if __name__ == "__main__":
     unittest.main()

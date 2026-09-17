@@ -27,6 +27,7 @@ proxy-groups:
       - ✅ 手动选择
       - 🗺️ 选择地区
       - DIRECT
+      - 📢 订阅信息
   
   - name: 🗺️ 选择地区
     type: select
@@ -52,6 +53,10 @@ proxy-groups:
   - name: ✅ 手动选择
     type: select
     proxies: [] # Will be filled with all nodes
+
+  - name: 📢 订阅信息
+    type: select
+    proxies: [] # Will be filled with info nodes
 
 rules:
   - DOMAIN-SUFFIX,google.com,🚀 选择代理
