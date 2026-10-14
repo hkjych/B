@@ -222,15 +222,21 @@ class Generator:
             })
             region_list_for_menu.append(others_group_name)
 
-        # 私有节点专属动态策略组 (仅在包含私有节点时创建)
+        # 私有节点专属策略组 (仅在包含私有节点时创建)
         node_obj_map = {n.name: n for n in nodes}
         private_nodes = [node for node in nodes if node.data.get('_is_private')]
         has_private = len(private_nodes) > 0
+        priv_groups = []
         if has_private:
             priv_node_names = [n.name for n in private_nodes]
             priv_auto_name = "⚡ 自动选择 | 👑 私有节点"
             priv_sorted = sorted(priv_node_names, key=get_node_quality_score, reverse=True)
-            dynamic_groups.append({
+            priv_groups.append({
+                'name': '👑 私有节点',
+                'type': 'select',
+                'proxies': ([priv_auto_name] + priv_sorted) if priv_sorted else ['DIRECT']
+            })
+            priv_groups.append({
                 'name': priv_auto_name,
                 'type': 'fallback',
                 'url': test_url,
@@ -239,11 +245,6 @@ class Generator:
                 'lazy': False,
                 'hidden': True,
                 'proxies': priv_sorted if priv_sorted else ['DIRECT']
-            })
-            dynamic_groups.append({
-                'name': '👑 私有节点',
-                'type': 'select',
-                'proxies': ([priv_auto_name] + priv_sorted) if priv_sorted else ['DIRECT']
             })
 
         # 5. 构建雨露均沾智能精选池 (Smart Pool Extractor)
@@ -391,8 +392,17 @@ class Generator:
                 g['proxies'] = node_names if node_names else ['DIRECT']
             elif g['name'] == '📢 订阅信息':
                 g['proxies'] = info_names if info_names else ['DIRECT']
-        
-        config['proxy-groups'] = template_groups + dynamic_groups
+
+        # 组装策略组：如果存在私有节点，将 👑 私有节点 插入在 🗺️ 选择地区 之前
+        final_template_groups = []
+        for g in template_groups:
+            if g['name'] == '🗺️ 选择地区' and has_private:
+                final_template_groups.extend(priv_groups)
+            final_template_groups.append(g)
+        if has_private and not any(g['name'] == '👑 私有节点' for g in final_template_groups):
+            final_template_groups.extend(priv_groups)
+
+        config['proxy-groups'] = final_template_groups + dynamic_groups
         config = deep_sanitize(config)
 
         # 6. Save YAML (Clash Meta)

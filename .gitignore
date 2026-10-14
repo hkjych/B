@@ -26,6 +26,7 @@ tmp/
 tg_summary.txt
 private_sources.yaml
 mock_private.txt
+mock_nodes.txt
 
 # 操作系统特定文件
 Thumbs.db
