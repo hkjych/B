@@ -54,14 +54,15 @@ class NodeProcessor:
         self.name_counter: Dict[str, int] = defaultdict(int)
 
     def deduplicate(self, nodes: List[Node]) -> List[Node]:
-        seen = set()
-        deduped = []
+        seen: Dict[str, Node] = {}
         for node in nodes:
             ident = node.get_identity()
             if ident not in seen:
-                seen.add(ident)
-                deduped.append(node)
-        return deduped
+                seen[ident] = node
+            elif node.data.get('_is_private') and not seen[ident].data.get('_is_private'):
+                # 私有节点优先级最高，覆盖已有的公共节点
+                seen[ident] = node
+        return list(seen.values())
 
     def clean_and_rename(self, nodes: List[Node]):
         self.used_names.clear()
@@ -95,7 +96,11 @@ class NodeProcessor:
                 if flag not in name:
                     name = f"{flag} {name}"
 
-            # 3. 避免与 Clash Policy Group 组名完全重名导致内核循环引用，并处理重名编号
+            # 3. 私有节点尊贵标识 (前缀 👑，防重复添加)
+            if node.data.get('_is_private') and not name.startswith('👑'):
+                name = f"👑 {name}"
+
+            # 4. 避免与 Clash Policy Group 组名完全重名导致内核循环引用，并处理重名编号
             if name in GROUP_NAMES or name in self.used_names:
                 count = max(1 if name in GROUP_NAMES else 2, self.name_counter[name] + 1)
                 new_name = f"{name} #{count}"
@@ -111,6 +116,7 @@ class NodeProcessor:
             node.data['name'] = name
 
     def filter_invalid(self, nodes: List[Node]) -> List[Node]:
+        ALLOWED_TYPES = {'vmess', 'vless', 'ss', 'trojan', 'hysteria2', 'hy2'}
         valid_nodes = []
         for node in nodes:
             n_data = node.data
@@ -120,12 +126,12 @@ class NodeProcessor:
             if any(kw in n_name for kw in NOTICE_NODE_KEYWORDS):
                 continue
 
-            n_type = n_data.get('type', 'unknown')
+            n_type = str(n_data.get('type', 'unknown')).lower()
             n_server = str(n_data.get('server', '')).strip()
             n_port = n_data.get('port')
 
-            # 1. 基础字段验证：type, server 不能为空
-            if n_type == 'unknown' or not n_server:
+            # 1. 基础字段验证：白名单协议类型、server 不能为空
+            if n_type not in ALLOWED_TYPES or not n_server:
                 continue
 
             # 过滤回环、占位或非法 server 地址
@@ -204,10 +210,12 @@ class NodeProcessor:
             elif n_type in ('hysteria2', 'hy2'):
                 if not n_data.get('password'):
                     continue
-                # 校验 obfs 完整性：有 obfs 但无 obfs-password 时剔除孤立的 obfs 字段
+                # 校验 obfs 完整性：如果为 none 或无 obfs-password 时剔除孤立/非法的 obfs 字段
                 obfs = n_data.get('obfs')
-                if obfs and obfs != 'none' and not n_data.get('obfs-password'):
-                    n_data.pop('obfs', None)
+                if obfs:
+                    if str(obfs).lower() == 'none' or not n_data.get('obfs-password'):
+                        n_data.pop('obfs', None)
+                        n_data.pop('obfs-password', None)
 
             valid_nodes.append(node)
         return valid_nodes

@@ -70,7 +70,8 @@ rules:
   - DOMAIN-SUFFIX,twitter.com,🚀 选择代理
   - DOMAIN-SUFFIX,netflix.com,🚀 选择代理
   - DOMAIN-SUFFIX,cn,DIRECT
-  - GEOIP,CN,DIRECT,no-resolve
+  - GEOSITE,cn,DIRECT
+  - GEOIP,CN,DIRECT
   - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
   - IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
   - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve

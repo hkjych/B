@@ -306,14 +306,16 @@ class Node:
     def to_url(self) -> str:
         t = self.type.lower()
         tag = quote(self.name)
-        server = self.data.get('server', '')
+        server = str(self.data.get('server', '')).strip()
         port = self.data.get('port', '')
+        # 符合 RFC 3986：如果 server 为 IPv6 地址且未加括号，自动补齐方括号避免 URL 解析崩溃
+        url_server = f"[{server}]" if (':' in server and not server.startswith('[')) else server
 
         if t == 'ss':
             cipher = self.data.get('cipher', '')
             pwd = self.data.get('password', '')
             userinfo = b64encodes(f"{cipher}:{pwd}")
-            return f"ss://{userinfo}@{server}:{port}#{tag}"
+            return f"ss://{userinfo}@{url_server}:{port}#{tag}"
 
         elif t == 'vmess':
             ws_opts = self.data.get('ws-opts') or {}
@@ -370,7 +372,7 @@ class Node:
                 if ropts.get('public-key'): query.append("pbk=" + quote(str(ropts['public-key'])))
                 if ropts.get('short-id'): query.append("sid=" + quote(str(ropts['short-id'])))
             qstr = "?" + "&".join(query) if query else ""
-            return f"vless://{uuid}@{server}:{port}{qstr}#{tag}"
+            return f"vless://{uuid}@{url_server}:{port}{qstr}#{tag}"
 
         elif t == 'trojan':
             pwd = quote(str(self.data.get('password', '')))
@@ -387,7 +389,7 @@ class Node:
                 if ropts.get('public-key'): query.append("pbk=" + quote(str(ropts['public-key'])))
                 if ropts.get('short-id'): query.append("sid=" + quote(str(ropts['short-id'])))
             qstr = "?" + "&".join(query) if query else ""
-            return f"trojan://{pwd}@{server}:{port}{qstr}#{tag}"
+            return f"trojan://{pwd}@{url_server}:{port}{qstr}#{tag}"
 
         elif t in ('hysteria2', 'hy2'):
             pwd = quote(str(self.data.get('password', '')))
@@ -399,7 +401,7 @@ class Node:
             if self.data.get('obfs-password'):
                 query.append("obfs-password=" + str(self.data.get('obfs-password')))
             qstr = "?" + "&".join(query) if query else ""
-            return f"hy2://{pwd}@{server}:{port}{qstr}#{tag}"
+            return f"hy2://{pwd}@{url_server}:{port}{qstr}#{tag}"
 
         return ""
 

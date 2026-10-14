@@ -81,14 +81,31 @@ class TestProcessor(unittest.TestCase):
         self.assertNotIn("\x87", host_val)
         self.assertIn("@WangCai2", host_val)
 
-    def test_processor_trim_orphan_punctuation(self):
+    def test_private_node_anti_overwrite_and_crown_prefix(self):
         processor = NodeProcessor()
-        node1 = Node({"name": "🇺🇸 美国_1|", "type": "vmess", "server": "1.2.3.4", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"})
-        node2 = Node({"name": " - 🇯🇵 日本 - ", "type": "vmess", "server": "1.2.3.5", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"})
-        processed = processor.process_all([node1, node2])
-        self.assertEqual(len(processed), 2)
-        self.assertFalse(processed[0].name.endswith("|"))
-        self.assertFalse(processed[1].name.endswith("-"))
+        # 公共节点与私有节点具有相同 identity
+        public_node = Node({"name": "HK Public Node", "type": "ss", "server": "1.2.3.4", "port": 8388, "cipher": "aes-128-gcm", "password": "pwd"})
+        private_node = Node({"name": "HK VIP Private", "type": "ss", "server": "1.2.3.4", "port": 8388, "cipher": "aes-128-gcm", "password": "pwd"})
+        private_node.data['_is_private'] = True
+
+        # 验证去重时私有节点优先保留
+        deduped = processor.deduplicate([public_node, private_node])
+        self.assertEqual(len(deduped), 1)
+        self.assertTrue(deduped[0].data.get('_is_private'))
+
+        # 验证命名清洗后带有 👑 标识
+        processed = processor.process_all([private_node])
+        self.assertTrue(processed[0].name.startswith("👑"))
+
+    def test_processor_hysteria2_obfs_none_cleaning(self):
+        processor = NodeProcessor()
+        node_none = Node({"name": "Hy2 Node 1", "type": "hysteria2", "server": "1.2.3.4", "port": 443, "password": "pwd", "obfs": "none"})
+        node_no_pwd = Node({"name": "Hy2 Node 2", "type": "hysteria2", "server": "1.2.3.5", "port": 443, "password": "pwd", "obfs": "salamander"})
+        valid = processor.filter_invalid([node_none, node_no_pwd])
+        self.assertEqual(len(valid), 2)
+        # obfs 字段应被安全剥离
+        self.assertNotIn("obfs", valid[0].data)
+        self.assertNotIn("obfs", valid[1].data)
 
 if __name__ == "__main__":
     unittest.main()

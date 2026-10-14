@@ -23,25 +23,38 @@ async def main():
 
     now = datetime.datetime.now()
     source_infos = []
+    smart_pool_settings = {}
     try:
         with open(sources_file, 'r', encoding='utf-8') as f:
             data = yaml.safe_load(f) or {}
             sources_data = data.get('sources', [])
+            smart_pool_settings = data.get('settings', {}).get('smart_pool', {}) or {}
     except Exception as e:
         logger.error(f"Failed to read {sources_file}: {e}")
         return
         
+    # Mark public sources as is_private = False
+    for s in sources_data:
+        if isinstance(s, dict):
+            s['is_private'] = False
+
     # Append private sources from Environment Variable (GitHub Secrets)
     private_sources = os.getenv('PRIVATE_SOURCES')
     if private_sources:
         try:
             private_data = yaml.safe_load(private_sources)
             if isinstance(private_data, list):
+                for p in private_data:
+                    if isinstance(p, dict):
+                        p['is_private'] = True
                 sources_data.extend(private_data)
                 logger.info(f"Loaded {len(private_data)} private sources from Secrets.")
             elif isinstance(private_data, dict):
                 p_sources = private_data.get('sources', [])
                 if isinstance(p_sources, list):
+                    for p in p_sources:
+                        if isinstance(p, dict):
+                            p['is_private'] = True
                     sources_data.extend(p_sources)
                     logger.info(f"Loaded {len(p_sources)} private sources from Secrets dict.")
         except Exception as e:
@@ -71,7 +84,8 @@ async def main():
             source_infos.append({
                 'name': name,
                 'url': url,
-                'filters': filters
+                'filters': filters,
+                'is_private': bool(s.get('is_private', False))
             })
     
     if not source_infos:
@@ -100,7 +114,7 @@ async def main():
             yaml.dump({"proxies": [n.to_clash() for n in processed_nodes]}, f, allow_unicode=True)
     else:
         elapsed_time = time.time() - start_time
-        generator = Generator(TEMPLATE_FILE)
+        generator = Generator(TEMPLATE_FILE, pool_settings=smart_pool_settings)
         gen_stats = generator.generate(processed_nodes, OUTPUT_FILE, active_source_count, raw_count, elapsed_time)
         
         # 5. Update README (统一更新顶部徽章、地区统计表与各源贡献度明细)

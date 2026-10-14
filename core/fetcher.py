@@ -61,11 +61,11 @@ class Fetcher:
             await self.client.aclose()
             self.client = None
 
-    async def fetch_nodes(self, url: str, filters: Optional[Dict[str, Any]] = None) -> List[Node]:
+    async def fetch_nodes(self, url: str, filters: Optional[Dict[str, Any]] = None, is_private: bool = False) -> List[Node]:
         async with self.semaphore:
-            return await self._fetch_nodes_internal(url, filters)
+            return await self._fetch_nodes_internal(url, filters, is_private=is_private)
 
-    async def _fetch_nodes_internal(self, url: str, filters: Optional[Dict[str, Any]] = None) -> List[Node]:
+    async def _fetch_nodes_internal(self, url: str, filters: Optional[Dict[str, Any]] = None, is_private: bool = False) -> List[Node]:
         is_recursive = url.startswith('*')
         if is_recursive:
             url = url[1:]
@@ -130,7 +130,7 @@ class Fetcher:
             if sub_urls:
                 sub_urls = list(dict.fromkeys(sub_urls))
                 logger.info(f"  - Found {len(sub_urls)} sub-urls in {url}")
-                tasks = [self.fetch_nodes(u, filters) for u in sub_urls]
+                tasks = [self.fetch_nodes(u, filters, is_private=is_private) for u in sub_urls]
                 results = await asyncio.gather(*tasks, return_exceptions=True)
                 all_nodes = []
                 for res in results:
@@ -159,6 +159,10 @@ class Fetcher:
                     ignore_types.add('hy2')
 
             nodes = [n for n in nodes if str(getattr(n, 'type', '')).lower() not in ignore_types]
+
+        if is_private:
+            for n in nodes:
+                n.data['_is_private'] = True
 
         if nodes:
             logger.info(f"  - Successfully parsed {len(nodes)} nodes from {url}")
@@ -236,22 +240,25 @@ async def parallel_fetch(source_infos: List[Dict[str, Any]], timeout: float = 10
     使用全局连接池高效并行抓取，返回 (全量节点列表, 按源归类的明细列表)
     """
     async with Fetcher(timeout=timeout, connect_timeout=connect_timeout) as fetcher:
-        tasks = [fetcher.fetch_nodes(info['url'], info.get('filters')) for info in source_infos]
+        tasks = [fetcher.fetch_nodes(info['url'], info.get('filters'), is_private=info.get('is_private', False)) for info in source_infos]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         all_nodes = []
         source_results = []
         for info, res in zip(source_infos, results):
             s_name = info.get('name', '未命名源')
+            is_priv = info.get('is_private', False)
             if isinstance(res, Exception) or not res:
                 source_results.append({
                     'name': s_name,
-                    'nodes': []
+                    'nodes': [],
+                    'is_private': is_priv
                 })
             else:
                 all_nodes.extend(res)
                 source_results.append({
                     'name': s_name,
-                    'nodes': res
+                    'nodes': res,
+                    'is_private': is_priv
                 })
         return all_nodes, source_results

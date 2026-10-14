@@ -3,7 +3,7 @@ import yaml
 import datetime
 import re
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from core.parser import Node
 from utils.regions import REGIONS_DB, match_region, REGION_NAMES
 from utils.common import b64encodes
@@ -79,9 +79,10 @@ SafeDumper.add_representer(str, _represent_str)
 
 
 class Generator:
-    def __init__(self, template_path: str):
+    def __init__(self, template_path: str, pool_settings: Optional[Dict[str, Any]] = None):
         with open(template_path, 'r', encoding='utf-8') as f:
             self.template = yaml.safe_load(f) or {}
+        self.pool_settings = pool_settings or {}
 
     def generate(self, nodes: List[Node], output_path: str, source_count: int = 0, raw_count: int = 0, elapsed_time: float = 0):
         now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -221,6 +222,30 @@ class Generator:
             })
             region_list_for_menu.append(others_group_name)
 
+        # 私有节点专属动态策略组 (仅在包含私有节点时创建)
+        node_obj_map = {n.name: n for n in nodes}
+        private_nodes = [node for node in nodes if node.data.get('_is_private')]
+        has_private = len(private_nodes) > 0
+        if has_private:
+            priv_node_names = [n.name for n in private_nodes]
+            priv_auto_name = "⚡ 自动选择 | 👑 私有节点"
+            priv_sorted = sorted(priv_node_names, key=get_node_quality_score, reverse=True)
+            dynamic_groups.append({
+                'name': priv_auto_name,
+                'type': 'fallback',
+                'url': test_url,
+                'interval': test_interval,
+                'timeout': test_timeout,
+                'lazy': False,
+                'hidden': True,
+                'proxies': priv_sorted if priv_sorted else ['DIRECT']
+            })
+            dynamic_groups.append({
+                'name': '👑 私有节点',
+                'type': 'select',
+                'proxies': ([priv_auto_name] + priv_sorted) if priv_sorted else ['DIRECT']
+            })
+
         # 5. 构建雨露均沾智能精选池 (Smart Pool Extractor)
 
         def is_china_node(name: str) -> bool:
@@ -239,46 +264,131 @@ class Generator:
                 return True
             return False
 
-        # 核心主流地区（港、日、美、新）适当倾斜配置名额
-        CORE_REGIONS = {'HK', 'JP', 'US', 'SG'}
-        smart_pool_nodes = []
+        def _parse_limit(val: Any, default: int) -> float:
+            if val is None or val == "":
+                return default
+            try:
+                iv = int(val)
+                return float('inf') if iv == -1 else max(0, iv)
+            except (ValueError, TypeError):
+                return default
 
+        # 解析 Smart Pool 配置 (方案 1: 防呆安全型，空值回退默认值，-1 不限，0 禁用)
+        cfg_core_regions = self.pool_settings.get('core_regions')
+        if not isinstance(cfg_core_regions, list) or not cfg_core_regions:
+            cfg_core_regions = ["HK", "JP", "US", "SG"]
+        core_regions_set = set(cfg_core_regions)
+
+        priv_cfg = self.pool_settings.get('private') or {}
+        priv_max_total = _parse_limit(priv_cfg.get('max_total'), 12)
+        priv_core_limit = _parse_limit(priv_cfg.get('core_per_region'), 3)
+        priv_other_limit = _parse_limit(priv_cfg.get('other_per_region'), 1)
+
+        pub_cfg = self.pool_settings.get('public') or {}
+        pub_core_limit = _parse_limit(pub_cfg.get('core_per_region'), 8)
+        pub_other_limit = _parse_limit(pub_cfg.get('other_per_region'), 4)
+
+        min_pool_size = _parse_limit(self.pool_settings.get('min_pool_size'), 20)
+        max_pool_size = _parse_limit(self.pool_settings.get('max_pool_size'), 35)
+
+        priv_selected = []
+        pub_selected = []
+
+        # 1. 精选私有节点代表 (仅限海外节点，按各地区配额提取)
+        if has_private and priv_max_total > 0:
+            for key in active_keys:
+                if key == 'CN': continue
+                candidates = [
+                    n for n in region_nodes[key]
+                    if not is_china_node(n) and node_obj_map[n].data.get('_is_private')
+                ]
+                if not candidates: continue
+                candidates_sorted = sorted(candidates, key=get_node_quality_score, reverse=True)
+                limit = priv_core_limit if key in core_regions_set else priv_other_limit
+                if limit > 0:
+                    limit_count = len(candidates_sorted) if limit == float('inf') else int(limit)
+                    priv_selected.extend(candidates_sorted[:limit_count])
+
+            if others:
+                other_priv = [
+                    n for n in others
+                    if not is_china_node(n) and node_obj_map[n].data.get('_is_private')
+                ]
+                if other_priv and priv_other_limit > 0:
+                    other_sorted = sorted(other_priv, key=get_node_quality_score, reverse=True)
+                    limit_count = len(other_sorted) if priv_other_limit == float('inf') else int(priv_other_limit)
+                    priv_selected.extend(other_sorted[:limit_count])
+
+            # 私有节点全局上限截断 (按质量排序)
+            if priv_max_total != float('inf') and len(priv_selected) > priv_max_total:
+                priv_selected = sorted(priv_selected, key=get_node_quality_score, reverse=True)[:int(priv_max_total)]
+
+        # 2. 精选公共节点代表 (用于日常兜底)
         for key in active_keys:
-            if key == 'CN': continue  # 排除纯国内组
-            candidates = [n for n in region_nodes[key] if not is_china_node(n)]
+            if key == 'CN': continue
+            candidates = [
+                n for n in region_nodes[key]
+                if not is_china_node(n) and not node_obj_map[n].data.get('_is_private')
+            ]
             if not candidates: continue
             candidates_sorted = sorted(candidates, key=get_node_quality_score, reverse=True)
-            max_limit = 8 if key in CORE_REGIONS else 4
-            smart_pool_nodes.extend(candidates_sorted[:max_limit])
+            limit = pub_core_limit if key in core_regions_set else pub_other_limit
+            if limit > 0:
+                limit_count = len(candidates_sorted) if limit == float('inf') else int(limit)
+                pub_selected.extend(candidates_sorted[:limit_count])
 
         if others:
-            other_candidates = [n for n in others if not is_china_node(n)]
-            if other_candidates:
-                other_sorted = sorted(other_candidates, key=get_node_quality_score, reverse=True)
-                smart_pool_nodes.extend(other_sorted[:4])
+            other_pub = [
+                n for n in others
+                if not is_china_node(n) and not node_obj_map[n].data.get('_is_private')
+            ]
+            if other_pub and pub_other_limit > 0:
+                other_sorted = sorted(other_pub, key=get_node_quality_score, reverse=True)
+                limit_count = len(other_sorted) if pub_other_limit == float('inf') else int(pub_other_limit)
+                pub_selected.extend(other_sorted[:limit_count])
 
-        # 兜底保障：若精选节点数少于 20 个，从全量非 CN 节点中按分数补充至 30 个
-        oversea_nodes = [n for n in node_names if not is_china_node(n)]
-        if len(smart_pool_nodes) < 20 and oversea_nodes:
-            fallback_sorted = sorted(oversea_nodes, key=get_node_quality_score, reverse=True)
+        # 3. 编排 Smart Pool: 私有节点置顶，公共节点紧随其后作为容灾兜底
+        smart_pool_nodes = priv_selected + pub_selected
+
+        # 4. 全局最大容量截断 (防测速风暴，优先保全私有节点)
+        if max_pool_size != float('inf') and len(smart_pool_nodes) > max_pool_size:
+            max_limit_int = int(max_pool_size)
+            if len(priv_selected) >= max_limit_int:
+                smart_pool_nodes = priv_selected[:max_limit_int]
+            else:
+                remain_slots = max_limit_int - len(priv_selected)
+                smart_pool_nodes = priv_selected + pub_selected[:remain_slots]
+
+        # 5. 保底补充 (min_pool_size): 若节点过少，从公共海外全量节点按质量补齐
+        pub_oversea_nodes = [
+            n for n in node_names
+            if not is_china_node(n) and not node_obj_map[n].data.get('_is_private')
+        ]
+        min_limit_int = int(min_pool_size) if min_pool_size != float('inf') else len(pub_oversea_nodes)
+        if min_limit_int > 0 and len(smart_pool_nodes) < min_limit_int and pub_oversea_nodes:
+            fallback_sorted = sorted(pub_oversea_nodes, key=get_node_quality_score, reverse=True)
             for fn in fallback_sorted:
                 if fn not in smart_pool_nodes:
                     smart_pool_nodes.append(fn)
-                if len(smart_pool_nodes) >= 30:
+                if len(smart_pool_nodes) >= min_limit_int:
                     break
 
         if not smart_pool_nodes:
-            smart_pool_nodes = oversea_nodes if oversea_nodes else node_names
+            oversea_all = [n for n in node_names if not is_china_node(n)]
+            smart_pool_nodes = pub_oversea_nodes if pub_oversea_nodes else (oversea_all if oversea_all else node_names)
 
-        # 5. Fill Template Groups
+        # 6. Fill Template Groups
         template_groups = config.get('proxy-groups', [])
         for g in template_groups:
-            if g['name'] == '🗺️ 选择地区':
+            if g['name'] == '🚀 选择代理':
+                if has_private and '👑 私有节点' not in g['proxies']:
+                    g['proxies'] = ['👑 私有节点'] + [p for p in g['proxies'] if p != '👑 私有节点']
+            elif g['name'] == '🗺️ 选择地区':
                 g['proxies'] = region_list_for_menu if region_list_for_menu else ['DIRECT']
             elif g['name'] in ('♻️ 自动选择', '🔰 延迟最低'):
                 g['proxies'] = smart_pool_nodes if smart_pool_nodes else ['DIRECT']
             elif g['name'] == '✅ 手动选择':
-                g['proxies'] = (info_names + node_names) if (info_names or node_names) else ['DIRECT']
+                g['proxies'] = node_names if node_names else ['DIRECT']
             elif g['name'] == '📢 订阅信息':
                 g['proxies'] = info_names if info_names else ['DIRECT']
         

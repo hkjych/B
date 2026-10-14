@@ -70,9 +70,95 @@ class TestGenerator(unittest.TestCase):
             self.assertEqual(len(info_group["proxies"]), 5)
             self.assertTrue(any("⚠️" in p for p in info_group["proxies"]))
 
-            # 5. 验证 ✅ 手动选择 前 5 个为信息节点
+            # 5. 验证 ✅ 手动选择 仅包含真实节点，去除非代理信息节点
             manual_proxies = groups["✅ 手动选择"]["proxies"]
-            self.assertTrue("⚠️ 本组仅作展示·请勿选择" in manual_proxies[0])
+            self.assertFalse(any("⚠️" in p for p in manual_proxies))
+            self.assertIn("🇨🇭 瑞士 #1", manual_proxies)
+
+    def test_generator_private_nodes_and_quota(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template_path = os.path.join(tmpdir, "config.yaml")
+            output_path = os.path.join(tmpdir, "output.yaml")
+            with open(template_path, "w", encoding="utf-8") as f:
+                yaml.safe_dump(self.template_data, f)
+
+            # 构造 15 个私有节点 (香港 10 个，日本 5 个) + 5 个公共节点
+            nodes = []
+            for i in range(10):
+                n = Node({"name": f"👑 🇭🇰 私有香港 {i}", "type": "ss", "server": f"1.1.1.{i+10}", "port": 443})
+                n.data['_is_private'] = True
+                nodes.append(n)
+            for i in range(5):
+                n = Node({"name": f"👑 🇯🇵 私有日本 {i}", "type": "vmess", "server": f"2.2.2.{i+10}", "port": 443})
+                n.data['_is_private'] = True
+                nodes.append(n)
+            for i in range(5):
+                n = Node({"name": f"🇺🇸 公共美国 {i}", "type": "trojan", "server": f"3.3.3.{i+10}", "port": 443})
+                nodes.append(n)
+
+            pool_settings = {
+                "core_regions": ["HK", "JP", "US", "SG"],
+                "private": {
+                    "max_total": 4,          # 限制私有最多 4 个
+                    "core_per_region": 2,     # 核心地区每区 2 个
+                    "other_per_region": 1
+                },
+                "public": {
+                    "core_per_region": 3,
+                    "other_per_region": 1
+                },
+                "min_pool_size": 5,
+                "max_pool_size": 15
+            }
+
+            generator = Generator(template_path, pool_settings=pool_settings)
+            generator.generate(nodes, output_path)
+
+            with open(output_path, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f)
+
+            groups = {g["name"]: g for g in cfg["proxy-groups"]}
+
+            # 1. 验证动态生成了 👑 私有节点 策略组与子测速组
+            self.assertIn("👑 私有节点", groups)
+            self.assertIn("⚡ 自动选择 | 👑 私有节点", groups)
+            # 专属组应包含全部 15 个私有节点
+            self.assertEqual(len(groups["👑 私有节点"]["proxies"]), 16) # 1 个 auto + 15 个节点
+
+            # 2. 验证 🚀 选择代理 首页排在第一位的是 👑 私有节点
+            top_proxies = groups["🚀 选择代理"]["proxies"]
+            self.assertEqual(top_proxies[0], "👑 私有节点")
+
+            # 3. 验证 ♻️ 自动选择 中，私有节点数量严格被限制在 max_total (4个) 内
+            auto_proxies = groups["♻️ 自动选择"]["proxies"]
+            priv_in_auto = [p for p in auto_proxies if p.startswith("👑")]
+            self.assertLessEqual(len(priv_in_auto), 4)
+
+            # 4. 验证私有节点排在公共节点前面
+            self.assertTrue(auto_proxies[0].startswith("👑"))
+
+    def test_pool_settings_empty_and_special_values(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template_path = os.path.join(tmpdir, "config.yaml")
+            output_path = os.path.join(tmpdir, "output.yaml")
+            with open(template_path, "w", encoding="utf-8") as f:
+                yaml.safe_dump(self.template_data, f)
+
+            # 1 个私有节点，测试 max_total 为 0 (禁用)
+            node_priv = Node({"name": "👑 🇭🇰 私有香港", "type": "ss", "server": "1.1.1.1", "port": 443})
+            node_priv.data['_is_private'] = True
+            node_pub = Node({"name": "🇯🇵 公共日本", "type": "ss", "server": "2.2.2.2", "port": 443})
+
+            # max_total: 0 -> 私有节点不进自动选择
+            gen_zero = Generator(template_path, pool_settings={"private": {"max_total": 0}})
+            gen_zero.generate([node_priv, node_pub], output_path)
+
+            with open(output_path, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f)
+            groups = {g["name"]: g for g in cfg["proxy-groups"]}
+            auto_proxies = groups["♻️ 自动选择"]["proxies"]
+            self.assertNotIn("👑 🇭🇰 私有香港", auto_proxies)
+            self.assertIn("🇯🇵 公共日本", auto_proxies)
 
     def test_generator_safedumper_quotes_and_deep_sanitize(self):
         with tempfile.TemporaryDirectory() as tmpdir:
