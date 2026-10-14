@@ -20,10 +20,12 @@ ENV/
 # 日志文件
 *.log
 
-# 临时文件
+# 临时与本地私密文件
 temp/
 tmp/
 tg_summary.txt
+private_sources.yaml
+mock_private.txt
 
 # 操作系统特定文件
 Thumbs.db

@@ -148,20 +148,110 @@
 
 ---
 
-## 🚀 私有化部署与 Fork 指南
+## 🚀 私有化部署与私有节点配置指南
 
-如果你想拥有专属的私有订阅源聚合池，可以轻松 Fork 本项目免费部署在 GitHub Actions 上：
+如果你想拥有专属的私有节点池，或者将自建 VPS、商业机场订阅与公共精选池深度融合，本项目提供原生的**私有节点特权支持与容灾兜底体系**：
 
-1. **Fork 本仓库**：点击右上角 `Fork` 到个人账号下。
-2. **配置私密源 (可选)**：进入仓库 `Settings` → `Secrets and variables` → `Actions`，添加 `PRIVATE_SOURCES`（支持填入每行一个私密订阅链接）。
-3. **开启 Actions**：在 `Actions` 标签页中点击 `I understand my workflows, go ahead and enable them` 激活自动每 2 小时定时抓取。
-4. **本地运行**：
-   ```bash
-   git clone --depth=1 https://github.com/lanzm/MetaFetch.git
-   cd MetaFetch
-   pip install -r requirements.txt
-   python main.py
-   ```
+### 1. 私有节点配置（支持 3 种方式）
+
+无论采用哪种方式，私有节点都会自动前缀 `👑` 尊贵皇冠标识，并在去重时享有最高优先级（绝不被公共免费源覆盖）：
+
+- **方式一（推荐 · GitHub Actions 云端自动构建）：**
+  在 GitHub 仓库 `Settings` → `Secrets and variables` → `Actions` 中，添加 Secret 变量 `PRIVATE_SOURCES`，内容格式为标准 YAML：
+  ```yaml
+  sources:
+    - name: "👑 我的自建 VPS"
+      url: "https://your-domain.com/sub/my-vps-link"
+    - name: "👑 我的付费商业机场"
+      url: "https://your-airport.com/api/v1/client/subscribe?token=xxxx"
+  ```
+- **方式二（本地开发与测试 · 防泄露）：**
+  在项目根目录新建 `private_sources.yaml`（已配置 `.gitignore`，绝对不会误提交到 GitHub），格式同上。运行 `python main.py` 时会自动加载并标记为私有源。
+- **方式三（`sources.yaml` 直接配置）：**
+  直接在 `sources.yaml` 中的某个源追加 `is_private: true` 属性：
+  ```yaml
+  - name: "👑 我的专属私有订阅"
+    url: "https://..."
+    is_private: true
+  ```
+
+---
+
+### 2. Smart Pool 订阅池与精选配额配置（`sources.yaml`）
+
+在 `sources.yaml` 顶层 `settings.smart_pool` 中可自由微调配额：
+
+```yaml
+settings:
+  smart_pool:
+    # 核心地区定义 (低延迟主力机房代码，享有名额倾斜)
+    core_regions: ["HK", "JP", "US", "SG"]
+
+    # 私有节点配额 (仅在配置了私有源时生效)
+    private:
+      max_total: 12             # 进入自动选择的私有节点总上限 (防机场节点过多挤爆)
+      core_per_region: 3        # 核心地区(港日美新)每个地区最多入选几个
+      other_per_region: 1       # 非核心地区每个地区最多入选几个
+
+    # 公共免费节点配额 (用于日常兜底)
+    public:
+      core_per_region: 8        # 核心地区每个地区最多入选几个
+      other_per_region: 4       # 非核心地区每个地区最多入选几个
+
+    # 自动选择池全局容量保障
+    min_pool_size: 20           # 自动选择池保底最少节点数
+    max_pool_size: 35           # 自动选择池最大容量上限 (防测速风暴)
+```
+
+> [!TIP]
+> **数值填写规则（防呆安全保障）：**
+> - **正整数 $N > 0$**：最多入选前 $N$ 个高质量节点；
+> - **置空 / `null` / 删除该项**：**安全防呆回退**，自动使用推荐默认值（如 12、3、1），误删数字绝不会引发测速风暴；
+> - **填 `-1`**：**无限制（Unlimited）**，符合条件的节点全量入选自动选择池；
+> - **填 `0`**：**禁用**，该项节点完全不进入自动选择池（仅保留在专属分组和地区分组中）。
+
+---
+
+### 3. Clash 策略组分流与容灾自愈机制
+
+当检测到私有节点存在时，MetaFetch 会动态编排如下分层策略组：
+
+```yaml
+proxy-groups:
+  - name: 🚀 选择代理
+    type: select
+    proxies:
+      - 👑 私有节点      # [动态生成] 首页第一位，与免费节点完全物理隔离
+      - ♻️ 自动选择      # [私有置顶 + 公共兜底] 适合日常使用，私有故障秒切公共
+      - 🔰 延迟最低      # [全员竞速打擂台] 实测测速最低者胜出，超时自动淘汰
+      - 🗺️ 选择地区      # 按地区分组查看
+      - ✅ 手动选择      # 全量有效节点列表
+      - DIRECT
+```
+
+1. **`👑 私有节点` 专属策略组：**
+   包含所有私有节点 + `⚡ 自动选择 | 👑 私有节点`（Fallback 测速组）。想纯用付费/自建 VPS 时一键直达，不与免费节点混杂。
+2. **`♻️ 自动选择`（双保险容灾机制）：**
+   精选私有节点排在列表最前列，公共优质节点紧随其后。平时优先享受私有节点速度；**当私有节点超时（>2000ms）或故障断网时，Clash Fallback 探针毫秒级自动跳过，无缝切换到公共节点接管**，网络永不断线！
+3. **`🔰 延迟最低`（纯性能打擂台）：**
+   私有与公共精选节点同时测速，只要私有节点超时连不上即被淘汰，通畅时优先选延迟最低的节点。
+4. **国内域名极速直连规则：**
+   集成 `GEOSITE,cn,DIRECT` 与 `GEOIP,CN,DIRECT`，彻底避免国内主流非 `.cn` 网站（B站、百度、QQ、淘宝、京东等）误走代理。
+
+---
+
+### 4. 本地运行与调试步骤
+
+```bash
+git clone --depth=1 https://github.com/lanzm/MetaFetch.git
+cd MetaFetch
+pip install -r requirements.txt
+
+# (可选) 若需要在本地调试私有节点，创建本地私密文件 private_sources.yaml：
+# echo "sources: [{name: '测试私有', url: 'https://...'}]" > private_sources.yaml
+
+python main.py
+```
 
 ---
 

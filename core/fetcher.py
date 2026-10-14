@@ -1,4 +1,5 @@
 import asyncio
+import os
 import re
 from typing import List, Dict, Any, Optional, Tuple
 import httpx
@@ -85,34 +86,44 @@ class Fetcher:
             targets.append(f"https://gh-proxy.com/{url}")
 
         content = None
-        # 确保 client 实例可用
-        client = self.client
-        close_client_after = False
-        if client is None:
-            client = httpx.AsyncClient(headers=self.headers, verify=False, follow_redirects=True, timeout=self.req_timeout)
-            close_client_after = True
+        # 支持本地文件路径直读 (例如 file:///... 或相对/绝对路径)，方便离线私密机场与本地测试
+        clean_file_path = url.replace('file:///', '').replace('file://', '')
+        if os.path.isfile(clean_file_path):
+            try:
+                with open(clean_file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            except Exception as e:
+                logger.warning(f"Failed to read local file {clean_file_path}: {e}")
 
-        try:
-            for target_url in targets:
-                try:
-                    logger.debug(f"Fetching: {target_url}")
-                    response = await client.get(target_url, timeout=self.req_timeout)
-                    if response.status_code == 200:
-                        text = response.content.decode('utf-8-sig', errors='ignore')
-                        # 识别假 200（如反代 404/502 HTML、Cloudflare 质询页）
-                        head_sample = text[:500].upper()
-                        if '<!DOCTYPE' in head_sample or '<HTML' in head_sample:
-                            logger.debug(f"  - Target {target_url} returned HTML webpage instead of raw data, trying next mirror.")
-                            continue
-                        content = text
-                        break
-                    else:
-                        logger.debug(f"  - Error HTTP {response.status_code} on {target_url}")
-                except Exception as e:
-                    logger.debug(f"  - Request Exception on {target_url}: {e}")
-        finally:
-            if close_client_after:
-                await client.aclose()
+        # 若非本地文件，则执行网络镜像请求
+        if not content:
+            client = self.client
+            close_client_after = False
+            if client is None:
+                client = httpx.AsyncClient(headers=self.headers, verify=False, follow_redirects=True, timeout=self.req_timeout)
+                close_client_after = True
+
+            try:
+                for target_url in targets:
+                    try:
+                        logger.debug(f"Fetching: {target_url}")
+                        response = await client.get(target_url, timeout=self.req_timeout)
+                        if response.status_code == 200:
+                            text = response.content.decode('utf-8-sig', errors='ignore')
+                            # 识别假 200（如反代 404/502 HTML、Cloudflare 质询页）
+                            head_sample = text[:500].upper()
+                            if '<!DOCTYPE' in head_sample or '<HTML' in head_sample:
+                                logger.debug(f"  - Target {target_url} returned HTML webpage instead of raw data, trying next mirror.")
+                                continue
+                            content = text
+                            break
+                        else:
+                            logger.debug(f"  - Error HTTP {response.status_code} on {target_url}")
+                    except Exception as e:
+                        logger.debug(f"  - Request Exception on {target_url}: {e}")
+            finally:
+                if close_client_after:
+                    await client.aclose()
 
         if not content:
             logger.warning(f"  - Failed to get any content for {url}")

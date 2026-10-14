@@ -33,12 +33,27 @@ async def main():
         logger.error(f"Failed to read {sources_file}: {e}")
         return
         
-    # Mark public sources as is_private = False
+    # 标记公共源（若 sources.yaml 中明确配置 is_private: true 则尊重配置）
     for s in sources_data:
         if isinstance(s, dict):
-            s['is_private'] = False
+            s['is_private'] = bool(s.get('is_private', False))
 
-    # Append private sources from Environment Variable (GitHub Secrets)
+    # 1. 尝试从本地 private_sources.yaml 加载私有源 (用于本地测试与安全防泄漏)
+    local_priv_file = os.path.join(os.path.dirname(__file__), 'private_sources.yaml')
+    if os.path.exists(local_priv_file):
+        try:
+            with open(local_priv_file, 'r', encoding='utf-8') as f:
+                lp_data = yaml.safe_load(f) or {}
+                lp_sources = lp_data if isinstance(lp_data, list) else lp_data.get('sources', [])
+                for p in lp_sources:
+                    if isinstance(p, dict):
+                        p['is_private'] = True
+                sources_data.extend(lp_sources)
+                logger.info(f"Loaded {len(lp_sources)} private sources from local private_sources.yaml.")
+        except Exception as e:
+            logger.warning(f"Failed to load local private_sources.yaml: {e}")
+
+    # 2. Append private sources from Environment Variable (GitHub Secrets)
     private_sources = os.getenv('PRIVATE_SOURCES')
     if private_sources:
         try:
