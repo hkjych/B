@@ -290,7 +290,7 @@ class Generator:
         pub_other_limit = _parse_limit(pub_cfg.get('other_per_region'), 4)
 
         min_pool_size = _parse_limit(self.pool_settings.get('min_pool_size'), 20)
-        max_pool_size = _parse_limit(self.pool_settings.get('max_pool_size'), 35)
+        max_pool_size = _parse_limit(self.pool_settings.get('max_pool_size'), 120)
 
         priv_selected = []
         pub_selected = []
