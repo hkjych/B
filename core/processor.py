@@ -65,14 +65,11 @@ class NodeProcessor:
                 seen[ident] = node
         return list(seen.values())
 
-    def clean_and_rename(self, nodes: List[Node]):
+    def clean_and_rename(self, nodes: List[Node]) -> List[Node]:
         self.used_names.clear()
         self.name_counter.clear()
 
         for node in nodes:
-            # 递归彻底清理节点所有属性（包括 plugin-opts, server, password, sni 等）中的控制字符
-            node.data = deep_sanitize(node.data)
-
             name = str(node.data.get('name') or 'node')
             # 1. 基础清理 (广告、Telegram 频道、不安全字符)
             for reg in CLEAN_AD_REGEXES:
@@ -115,6 +112,7 @@ class NodeProcessor:
 
             self.used_names.add(name)
             node.data['name'] = name
+        return nodes
 
     def filter_invalid(self, nodes: List[Node]) -> List[Node]:
         ALLOWED_TYPES = {'vmess', 'vless', 'ss', 'trojan', 'hysteria2', 'hy2'}
@@ -228,7 +226,11 @@ class NodeProcessor:
         return valid_nodes
 
     def process_all(self, nodes: List[Node]) -> List[Node]:
+        # 0. 预处理：彻底清理所有节点属性（server, uuid, password, name等）中的不可见控制字符与零宽字符
+        # 确保去重指纹计算与回环检测完全不受隐形字符污染
+        for node in nodes:
+            node.data = deep_sanitize(node.data)
         nodes = self.filter_invalid(nodes)  # 1. 过滤无效节点
-        nodes = self.deduplicate(nodes)     # 2. 去重
+        nodes = self.deduplicate(nodes)     # 2. 精准去重
         self.clean_and_rename(nodes)        # 3. 清洗命名
         return nodes

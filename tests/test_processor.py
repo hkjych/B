@@ -140,6 +140,23 @@ class TestProcessor(unittest.TestCase):
         self.assertIsInstance(valid[0].data.get('plugin-opts'), dict)
         self.assertEqual(valid[0].data['plugin-opts'].get('mode'), 'websocket')
 
+    def test_processor_process_all_step0_deep_sanitize_deduplication(self):
+        processor = NodeProcessor()
+        # 1. 验证带有零宽空格 \u200b 的相同节点能被精准去重
+        node1 = Node({"name": "HK Node 1", "type": "ss", "server": "1.2.3.4", "port": 8388, "cipher": "aes-128-gcm", "password": "pwd"})
+        # node2 在 server 属性末尾带有肉眼不可见的 \u200b 零宽空格
+        node2 = Node({"name": "HK Node 2", "type": "ss", "server": "1.2.3.4\u200b", "port": 8388, "cipher": "aes-128-gcm", "password": "pwd"})
+
+        processed = processor.process_all([node1, node2])
+        # 经过 Step 0 预清洗后，两者 server 一致，去重后只应保留 1 个节点
+        self.assertEqual(len(processed), 1)
+        self.assertEqual(processed[0].data['server'], "1.2.3.4")
+
+        # 2. 验证带有隐形字符的回环地址 127.0.0.1\u200b 无法绕过过滤
+        node_evil = Node({"name": "Evil Node", "type": "ss", "server": "127.0.0.1\u200b", "port": 8388, "cipher": "aes-128-gcm", "password": "pwd"})
+        processed_evil = processor.process_all([node_evil])
+        self.assertEqual(len(processed_evil), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
