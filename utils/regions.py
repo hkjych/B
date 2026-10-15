@@ -10,7 +10,7 @@ REGIONS_DB: Dict[str, Dict[str, Any]] = {
     'KR': {'name': '韩国', 'emoji': '🇰🇷', 'keywords': ['KR', 'Korea', 'KOR', 'South Korea', 'SouthKorea', 'Seoul', '首尔', 'Busan', '釜山', 'Incheon', '仁川']},
     'DE': {'name': '德国', 'emoji': '🇩🇪', 'keywords': ['DE', 'Germany', 'DEU', 'Frankfurt', '法兰克福', 'Berlin', '柏林', 'Munich', '慕尼黑', 'Dusseldorf', '杜塞尔多夫']},
     'GB': {'name': '英国', 'emoji': '🇬🇧', 'keywords': ['GB', 'UK', 'United Kingdom', 'UnitedKingdom', 'London', '伦敦', 'Manchester', '曼彻斯特']},
-    'FR': {'name': '法国', 'emoji': '🇫🇷', 'keywords': ['FR', 'France', 'FRA', 'Paris', '巴黎', 'Marseille', '马赛', '🇨🇵']},
+    'FR': {'name': '法国', 'emoji': '🇫🇷', 'keywords': ['FR', 'France', 'FRA', 'Paris', '巴黎', 'Marseille', '马赛']},
     'RU': {'name': '俄罗斯', 'emoji': '🇷🇺', 'keywords': ['RU', 'Russia', 'RUS', 'Moscow', '莫斯科']},
     'CA': {'name': '加拿大', 'emoji': '🇨🇦', 'keywords': ['CA', 'Canada', 'CAN', 'Toronto', '多伦多', 'Vancouver', '温哥华', 'Montreal', '蒙特利尔']},
     'VN': {'name': '越南', 'emoji': '🇻🇳', 'keywords': ['VN', 'Vietnam', 'VNM']},
@@ -58,27 +58,45 @@ REGION_NAMES: Dict[str, str] = {
 }
 
 _EMOJI_MAP = {info['emoji']: key for key, info in REGIONS_DB.items() if info.get('emoji')}
-_NAME_MAP = {info['name']: key for key, info in REGIONS_DB.items() if info.get('name')}
+_EMOJI_MAP['🇨🇵'] = 'FR'  # 兼容法国海外属地克利珀顿岛旗帜
 
+_CHINESE_KEYWORDS: List[Tuple[str, str]] = []
 _LONG_KEYWORDS: List[Tuple[str, str]] = []
-_SHORT_KEYWORD_PATTERNS: List[Tuple[str, re.Pattern]] = []
+_CODE_PATTERNS: List[Tuple[re.Pattern, str]] = []
+
+# 容易与英语高频单词/缩写发生冲突的短代码（必须严格大写匹配，且 ID 排除 ID: 或 ID= 等标号）
+AMBIGUOUS_CODES = {'NO', 'ID', 'IN', 'IT', 'AT', 'US', 'MY', 'CAN'}
 
 for key, info in REGIONS_DB.items():
+    if info.get('name'):
+        _CHINESE_KEYWORDS.append((info['name'], key))
     for kw in info['keywords']:
-        if len(kw) > 2:
-            _LONG_KEYWORDS.append((key, kw.lower()))
+        if re.search(r'[\u4e00-\u9fa5]', kw):
+            _CHINESE_KEYWORDS.append((kw, key))
+        elif len(kw) >= 4:
+            _LONG_KEYWORDS.append((kw.lower(), key))
         else:
-            # 2 字母短代码安全非字母边界匹配（避免匹配在单词中间）
-            pat = re.compile(rf'(?<![a-zA-Z]){re.escape(kw)}(?![a-zA-Z])', re.IGNORECASE)
-            _SHORT_KEYWORD_PATTERNS.append((key, pat))
+            # 2 字母或 3 字母短代码（如 HK, JP, US, USA, AUS, IND, RUS 等）
+            if kw.upper() in AMBIGUOUS_CODES:
+                if kw.upper() == 'ID':
+                    pat = re.compile(rf'(?<![a-zA-Z]){kw}(?![a-zA-Z:=0-9])')
+                else:
+                    pat = re.compile(rf'(?<![a-zA-Z]){kw}(?![a-zA-Z])')
+            else:
+                pat = re.compile(rf'(?<![a-zA-Z]){re.escape(kw)}(?![a-zA-Z])', re.IGNORECASE)
+            _CODE_PATTERNS.append((pat, key))
+
+# 核心优化：按关键词长度倒序排列，优先匹配最长完整名称（例如 Austria 优先于 AUS，Indonesia 优先于 IND）
+_CHINESE_KEYWORDS.sort(key=lambda x: len(x[0]), reverse=True)
+_LONG_KEYWORDS.sort(key=lambda x: len(x[0]), reverse=True)
 
 def match_region(name: str) -> Optional[str]:
     """
     统一的地区识别算法，分 4 级瀑布流精准匹配：
     1. Emoji 国旗优先匹配 (最精准)
-    2. 中文名称匹配
-    3. 长关键词与城市匹配
-    4. 2 字母短代码边界安全匹配
+    2. 中文名称与城市匹配 (按长度降序)
+    3. 英文全称与完整城市名匹配 (>=4字符，按长度降序，杜绝子串碰撞)
+    4. 2/3 字母短代码边界安全匹配 (排除英文单词与标号冲突)
     """
     if not name:
         return None
@@ -88,19 +106,19 @@ def match_region(name: str) -> Optional[str]:
         if emoji in name:
             return key
 
-    # Level 2: 中文名
-    for cname, key in _NAME_MAP.items():
+    # Level 2: 中文名及中文城市
+    for cname, key in _CHINESE_KEYWORDS:
         if cname in name:
             return key
 
-    # Level 3: 长关键词与城市名
+    # Level 3: 英文全称及完整城市名 (长度降序，解决 Austria 误判 AUS 等问题)
     name_lower = name.lower()
-    for key, kw_lower in _LONG_KEYWORDS:
+    for kw_lower, key in _LONG_KEYWORDS:
         if kw_lower in name_lower:
             return key
 
-    # Level 4: 2 字母短代码
-    for key, pat in _SHORT_KEYWORD_PATTERNS:
+    # Level 4: 2/3 字母短代码边界安全匹配
+    for pat, key in _CODE_PATTERNS:
         if pat.search(name):
             return key
 
