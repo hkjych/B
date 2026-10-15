@@ -223,16 +223,18 @@ class Fetcher:
 
         # 3. Try to parse as Base64 (Standard V2Ray style)
         if len(content) > 10 and not any(s in content for s in ["server:", "port:", "type:"]):
-            try:
-                decoded = b64decodes(content)
-                if decoded:
-                    lines = decoded.splitlines()
-                    for line in lines:
-                        line_s = line.strip()
-                        if line_s:
-                            nodes.append(Node(line_s))
-            except Exception:
-                pass
+            first_line = content.strip().splitlines()[0].strip().lower() if content.strip() else ""
+            if not first_line.startswith(ALLOWED_PROTOCOLS):
+                try:
+                    decoded = b64decodes(content)
+                    if decoded:
+                        lines = decoded.splitlines()
+                        for line in lines:
+                            line_s = line.strip()
+                            if line_s.lower().startswith(ALLOWED_PROTOCOLS):
+                                nodes.append(Node(line_s))
+                except Exception:
+                    pass
 
         if nodes:
             return nodes

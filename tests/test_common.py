@@ -22,5 +22,25 @@ class TestCommon(unittest.TestCase):
         self.assertEqual(b64decodes(encoded), raw)
         self.assertEqual(b64decodes_safe(encoded), raw)
 
+    def test_b64decodes_urlsafe_with_hyphens_and_underscores(self):
+        import base64
+        # 1. 包含 - 的 urlsafe 密文
+        raw1 = ">>>?hello"
+        enc1 = base64.urlsafe_b64encode(raw1.encode('utf-8')).decode('utf-8')
+        self.assertIn('-', enc1)
+        self.assertEqual(b64decodes(enc1), raw1)
+        self.assertEqual(b64decodes_safe(enc1), raw1)
+
+        # 2. 包含 _ 的 urlsafe 密文
+        raw2 = "hello?world?test"
+        enc2 = base64.urlsafe_b64encode(raw2.encode('utf-8')).decode('utf-8')
+        self.assertIn('_', enc2)
+        self.assertEqual(b64decodes(enc2), raw2)
+        self.assertEqual(b64decodes_safe(enc2), raw2)
+
+    def test_b64encodes_none_or_empty(self):
+        self.assertEqual(b64encodes(None), "")
+        self.assertEqual(b64encodes(""), "")
+
 if __name__ == "__main__":
     unittest.main()
