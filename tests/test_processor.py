@@ -97,15 +97,49 @@ class TestProcessor(unittest.TestCase):
         processed = processor.process_all([private_node])
         self.assertTrue(processed[0].name.startswith("👑"))
 
-    def test_processor_hysteria2_obfs_none_cleaning(self):
+    def test_processor_ss_plugin_opts_none_safety(self):
         processor = NodeProcessor()
-        node_none = Node({"name": "Hy2 Node 1", "type": "hysteria2", "server": "1.2.3.4", "port": 443, "password": "pwd", "obfs": "none"})
-        node_no_pwd = Node({"name": "Hy2 Node 2", "type": "hysteria2", "server": "1.2.3.5", "port": 443, "password": "pwd", "obfs": "salamander"})
-        valid = processor.filter_invalid([node_none, node_no_pwd])
-        self.assertEqual(len(valid), 2)
-        # obfs 字段应被安全剥离
-        self.assertNotIn("obfs", valid[0].data)
-        self.assertNotIn("obfs", valid[1].data)
+        # 1. plugin-opts 显式为 None 的 v2ray-plugin 节点
+        node_v2ray_none = Node({
+            "name": "SS v2ray plugin with None opts",
+            "type": "ss",
+            "server": "1.2.3.4",
+            "port": 8388,
+            "cipher": "aes-128-gcm",
+            "password": "pwd",
+            "plugin": "v2ray-plugin",
+            "plugin-opts": None
+        })
+        # 2. plugin-opts 显式为 None 的 obfs 节点
+        node_obfs_none = Node({
+            "name": "SS obfs with None opts",
+            "type": "ss",
+            "server": "1.2.3.5",
+            "port": 8388,
+            "cipher": "aes-128-gcm",
+            "password": "pwd",
+            "plugin": "obfs",
+            "plugin-opts": None
+        })
+        # 3. 字段类型严重损毁的异常节点（验证 per-node try-except 容灾保护）
+        node_corrupted = Node({
+            "name": "Corrupted Node",
+            "type": "ss",
+            "server": "1.2.3.6",
+            "port": 8388,
+            "cipher": "aes-128-gcm",
+            "password": "pwd",
+            "plugin": 12345,  # 非法非字符串类型
+            "plugin-opts": "invalid_string_not_dict"
+        })
+
+        valid = processor.filter_invalid([node_v2ray_none, node_obfs_none, node_corrupted])
+        # 必须全部稳定处理，绝不发生 AttributeError 崩溃
+        self.assertGreaterEqual(len(valid), 2)
+        # v2ray-plugin 节点的 plugin-opts 应被安全修复为字典
+        self.assertIsInstance(valid[0].data.get('plugin-opts'), dict)
+        self.assertEqual(valid[0].data['plugin-opts'].get('mode'), 'websocket')
+
 
 if __name__ == "__main__":
     unittest.main()

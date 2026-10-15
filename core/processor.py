@@ -3,6 +3,7 @@ from collections import defaultdict
 from typing import List, Set, Dict, Any
 from core.parser import Node
 from utils.regions import REGIONS_DB, match_region
+from utils.logger import logger
 
 # 清理广告与多余链接的预编译正则
 CLEAN_AD_REGEXES = [
@@ -119,105 +120,111 @@ class NodeProcessor:
         ALLOWED_TYPES = {'vmess', 'vless', 'ss', 'trojan', 'hysteria2', 'hy2'}
         valid_nodes = []
         for node in nodes:
-            n_data = node.data
-            n_name = str(n_data.get('name', ''))
-
-            # 过滤包含明显提示信息/公告/失效关键词的假节点
-            if any(kw in n_name for kw in NOTICE_NODE_KEYWORDS):
-                continue
-
-            n_type = str(n_data.get('type', 'unknown')).lower()
-            n_server = str(n_data.get('server', '')).strip()
-            n_port = n_data.get('port')
-
-            # 1. 基础字段验证：白名单协议类型、server 不能为空
-            if n_type not in ALLOWED_TYPES or not n_server:
-                continue
-
-            # 过滤回环、占位或非法 server 地址
-            if n_server.lower() in INVALID_SERVERS or any(c in n_server for c in (' ', '\n', '\r', '\t')):
-                continue
-
-            # 2. 验证 port 必须为有效端口 (1-65535)
-            if n_port is None:
-                continue
             try:
-                port_val = int(n_port)
-                if not (1 <= port_val <= 65535):
-                    continue
-                n_data['port'] = port_val
-            except (ValueError, TypeError):
-                continue
+                n_data = node.data
+                n_name = str(n_data.get('name', ''))
 
-            # 3. 协议特定必要字段验证
-            if n_type == 'vmess':
-                if not n_data.get('uuid'):
+                # 过滤包含明显提示信息/公告/失效关键词的假节点
+                if any(kw in n_name for kw in NOTICE_NODE_KEYWORDS):
                     continue
-            elif n_type == 'vless':
-                if not n_data.get('uuid'):
-                    continue
-            elif n_type == 'ss':
-                if not n_data.get('cipher') or not n_data.get('password'):
-                    continue
-                # 校验 Shadowsocks plugin
-                plugin = n_data.get('plugin')
-                if plugin:
-                    if plugin in ('obfs-local', 'simple-obfs'):
-                        plugin = 'obfs'
 
-                    opts = n_data.get('plugin-opts')
-                    if not isinstance(opts, dict):
-                        opts = {}
+                n_type = str(n_data.get('type', 'unknown')).lower()
+                n_server = str(n_data.get('server', '')).strip()
+                n_port = n_data.get('port')
 
-                    if plugin == 'obfs':
-                        mode = str(opts.get('mode', '')).lower()
-                        if mode in ('http', 'tls'):
+                # 1. 基础字段验证：白名单协议类型、server 不能为空
+                if n_type not in ALLOWED_TYPES or not n_server:
+                    continue
+
+                # 过滤回环、占位或非法 server 地址
+                if n_server.lower() in INVALID_SERVERS or any(c in n_server for c in (' ', '\n', '\r', '\t')):
+                    continue
+
+                # 2. 验证 port 必须为有效端口 (1-65535)
+                if n_port is None:
+                    continue
+                try:
+                    port_val = int(n_port)
+                    if not (1 <= port_val <= 65535):
+                        continue
+                    n_data['port'] = port_val
+                except (ValueError, TypeError):
+                    continue
+
+                # 3. 协议特定必要字段验证
+                if n_type == 'vmess':
+                    if not n_data.get('uuid'):
+                        continue
+                elif n_type == 'vless':
+                    if not n_data.get('uuid'):
+                        continue
+                elif n_type == 'ss':
+                    if not n_data.get('cipher') or not n_data.get('password'):
+                        continue
+                    # 校验 Shadowsocks plugin
+                    plugin = n_data.get('plugin')
+                    if plugin:
+                        if plugin in ('obfs-local', 'simple-obfs'):
+                            plugin = 'obfs'
+
+                        opts = n_data.get('plugin-opts') or {}
+                        if not isinstance(opts, dict):
+                            opts = {}
+
+                        if plugin == 'obfs':
+                            mode = str(opts.get('mode', '')).lower()
+                            if mode in ('http', 'tls'):
+                                opts['mode'] = mode
+                                n_data['plugin'] = 'obfs'
+                                n_data['plugin-opts'] = opts
+                            elif mode == 'websocket':
+                                # websocket 属于 v2ray-plugin 模式，自动纠正
+                                n_data['plugin'] = 'v2ray-plugin'
+                                opts['mode'] = 'websocket'
+                                n_data['plugin-opts'] = opts
+                            else:
+                                # 非法 obfs mode，移除插件属性降级为普通 ss
+                                n_data.pop('plugin', None)
+                                n_data.pop('plugin-opts', None)
+
+                        if n_data.get('plugin') == 'v2ray-plugin':
+                            opts = n_data.get('plugin-opts') or {}
+                            if not isinstance(opts, dict):
+                                opts = {}
+                            mode = str(opts.get('mode', 'websocket')).lower()
+                            if mode not in ('websocket', 'http', 'quic'):
+                                mode = 'websocket'
                             opts['mode'] = mode
-                            n_data['plugin'] = 'obfs'
-                            n_data['plugin-opts'] = opts
-                        elif mode == 'websocket':
-                            # websocket 属于 v2ray-plugin 模式，自动纠正
+                            for bool_key in ('mux', 'tls', 'skip-cert-verify'):
+                                if bool_key in opts:
+                                    val = opts[bool_key]
+                                    if isinstance(val, str):
+                                        opts[bool_key] = (val.lower() in ('true', '1', 'yes') or (bool_key == 'mux' and val not in ('0', 'false', 'no', '')))
+                                    elif isinstance(val, int):
+                                        opts[bool_key] = bool(val)
                             n_data['plugin'] = 'v2ray-plugin'
-                            opts['mode'] = 'websocket'
                             n_data['plugin-opts'] = opts
-                        else:
-                            # 非法 obfs mode，移除插件属性降级为普通 ss
+                        elif n_data.get('plugin') not in ('obfs', 'v2ray-plugin', 'shadow-tls', 'restls'):
+                            # 其他不支持的第三方插件，移除插件属性降级为普通 ss
                             n_data.pop('plugin', None)
                             n_data.pop('plugin-opts', None)
+                elif n_type == 'trojan':
+                    if not n_data.get('password'):
+                        continue
+                elif n_type in ('hysteria2', 'hy2'):
+                    if not n_data.get('password'):
+                        continue
+                    # 校验 obfs 完整性：如果为 none 或无 obfs-password 时剔除孤立/非法的 obfs 字段
+                    obfs = n_data.get('obfs')
+                    if obfs:
+                        if str(obfs).lower() == 'none' or not n_data.get('obfs-password'):
+                            n_data.pop('obfs', None)
+                            n_data.pop('obfs-password', None)
 
-                    if n_data.get('plugin') == 'v2ray-plugin':
-                        opts = n_data.get('plugin-opts', {})
-                        mode = str(opts.get('mode', 'websocket')).lower()
-                        if mode not in ('websocket', 'http', 'quic'):
-                            mode = 'websocket'
-                        opts['mode'] = mode
-                        for bool_key in ('mux', 'tls', 'skip-cert-verify'):
-                            if bool_key in opts:
-                                val = opts[bool_key]
-                                if isinstance(val, str):
-                                    opts[bool_key] = (val.lower() in ('true', '1', 'yes') or (bool_key == 'mux' and val not in ('0', 'false', 'no', '')))
-                                elif isinstance(val, int):
-                                    opts[bool_key] = bool(val)
-                        n_data['plugin'] = 'v2ray-plugin'
-                        n_data['plugin-opts'] = opts
-                    elif n_data.get('plugin') not in ('obfs', 'v2ray-plugin', 'shadow-tls', 'restls'):
-                        # 其他不支持的第三方插件，移除插件属性降级为普通 ss
-                        n_data.pop('plugin', None)
-                        n_data.pop('plugin-opts', None)
-            elif n_type == 'trojan':
-                if not n_data.get('password'):
-                    continue
-            elif n_type in ('hysteria2', 'hy2'):
-                if not n_data.get('password'):
-                    continue
-                # 校验 obfs 完整性：如果为 none 或无 obfs-password 时剔除孤立/非法的 obfs 字段
-                obfs = n_data.get('obfs')
-                if obfs:
-                    if str(obfs).lower() == 'none' or not n_data.get('obfs-password'):
-                        n_data.pop('obfs', None)
-                        n_data.pop('obfs-password', None)
-
-            valid_nodes.append(node)
+                valid_nodes.append(node)
+            except Exception as e:
+                logger.debug(f"Skipping malformed node during validation: {e}")
+                continue
         return valid_nodes
 
     def process_all(self, nodes: List[Node]) -> List[Node]:
