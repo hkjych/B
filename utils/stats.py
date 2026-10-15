@@ -53,6 +53,38 @@ def build_overview_markdown(
     return badge_content, table_content
 
 
+def prepare_source_stats(
+    raw_source_results: List[Dict[str, Any]],
+    processor: Optional[Any] = None,
+) -> List[Dict[str, Any]]:
+    """
+    清洗各源统计数据，并对私有源进行安全脱敏重命名：
+    - 单私有源：重命名为 '👑 我的私有订阅'
+    - 多私有源：重命名为 '👑 我的私有订阅 01'、'👑 我的私有订阅 02'
+    - 针对每个源，通过 processor.filter_invalid 统计真实有效节点数量
+    """
+    source_stats = []
+    total_privates = sum(1 for item in raw_source_results if item.get('is_private'))
+    priv_counter = 0
+
+    for item in raw_source_results:
+        raw_nodes = item.get('nodes', [])
+        valid_nodes = processor.filter_invalid(raw_nodes) if processor else raw_nodes
+        s_name = item.get('name', '未命名源')
+        is_priv = bool(item.get('is_private', False))
+
+        if is_priv:
+            priv_counter += 1
+            s_name = f"👑 我的私有订阅 {priv_counter:02d}" if total_privates > 1 else "👑 我的私有订阅"
+
+        source_stats.append({
+            'name': s_name,
+            'valid_count': len(valid_nodes),
+            'is_private': is_priv,
+        })
+    return source_stats
+
+
 def build_source_stats_markdown(source_results: List[Dict[str, Any]], now: Optional[datetime.datetime] = None) -> str:
     """生成源贡献明细表格 Markdown"""
     if now is None:
@@ -78,7 +110,8 @@ def build_source_stats_markdown(source_results: List[Dict[str, Any]], now: Optio
     for idx, item in enumerate(sorted_results, 1):
         v_count = item.get('valid_count', 0)
         pct = (v_count / total_valid * 100) if total_valid > 0 else 0
-        lines.append(f"| {idx} | `{item.get('name', '未命名源')}` | **{v_count}** 个 | `{pct:.2f}%` |")
+        safe_name = str(item.get('name', '未命名源')).replace('|', '-').replace('`', "'")
+        lines.append(f"| {idx} | `{safe_name}` | **{v_count}** 个 | `{pct:.2f}%` |")
 
     lines.extend([
         f"| **-** | **总计 (包含跨源重合)** | **{total_valid}** 个 | `100.00%` |",

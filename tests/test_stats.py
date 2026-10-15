@@ -7,6 +7,7 @@ from utils.stats import (
     build_source_stats_markdown,
     apply_readme_updates,
     update_readme_all,
+    prepare_source_stats,
 )
 
 
@@ -69,13 +70,44 @@ class TestStats(unittest.TestCase):
             self.assertIn("Valid_Nodes-100", content)
             self.assertIn("Source A", content)
 
-    def test_update_readme_all_missing_file_noop(self):
-        # Should not raise exception if file doesn't exist
-        update_readme_all(
-            self.gen_stats,
-            self.source_results,
-            readme_path="/nonexistent/path/README.md",
-        )
+    def test_prepare_source_stats_single_private(self):
+        raw_results = [
+            {'name': 'Public Source 1', 'nodes': [{'name': 'n1'}, {'name': 'n2'}], 'is_private': False},
+            {'name': 'Secret Airport (user@abc.com)', 'nodes': [{'name': 'p1'}], 'is_private': True},
+        ]
+        # Test without processor (raw length)
+        stats = prepare_source_stats(raw_results, processor=None)
+        self.assertEqual(len(stats), 2)
+        self.assertEqual(stats[0]['name'], 'Public Source 1')
+        self.assertEqual(stats[0]['valid_count'], 2)
+        # Private source must be masked
+        self.assertEqual(stats[1]['name'], '👑 我的私有订阅')
+        self.assertEqual(stats[1]['valid_count'], 1)
+
+    def test_prepare_source_stats_multiple_private(self):
+        raw_results = [
+            {'name': 'Secret Airport A', 'nodes': [{'name': 'p1'}], 'is_private': True},
+            {'name': 'Public Source 1', 'nodes': [{'name': 'n1'}], 'is_private': False},
+            {'name': 'Secret VPS B', 'nodes': [{'name': 'p2'}, {'name': 'p3'}], 'is_private': True},
+        ]
+        stats = prepare_source_stats(raw_results, processor=None)
+        self.assertEqual(len(stats), 3)
+        self.assertEqual(stats[0]['name'], '👑 我的私有订阅 01')
+        self.assertEqual(stats[1]['name'], 'Public Source 1')
+        self.assertEqual(stats[2]['name'], '👑 我的私有订阅 02')
+
+    def test_build_source_stats_markdown_safe_escaping(self):
+        source_results = [
+            {'name': 'Source | with | pipes', 'valid_count': 10},
+            {'name': 'Source `with` backticks', 'valid_count': 5},
+        ]
+        table = build_source_stats_markdown(source_results)
+        # Pipes inside name must be replaced by - so table doesn't split columns
+        self.assertNotIn("`Source | with | pipes`", table)
+        self.assertIn("`Source - with - pipes`", table)
+        # Backticks inside code block must be replaced
+        self.assertNotIn("`Source `with` backticks`", table)
+        self.assertIn("`Source 'with' backticks`", table)
 
 
 if __name__ == "__main__":

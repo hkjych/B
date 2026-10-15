@@ -7,7 +7,7 @@ import yaml
 from core.fetcher import parallel_fetch
 from core.processor import NodeProcessor
 from core.generator import Generator
-from utils.stats import update_readme_all
+from utils.stats import update_readme_all, prepare_source_stats
 from utils.notify import send_tg_notification
 from utils.logger import logger
 
@@ -27,8 +27,8 @@ async def main():
     try:
         with open(sources_file, 'r', encoding='utf-8') as f:
             data = yaml.safe_load(f) or {}
-            sources_data = data.get('sources', [])
-            smart_pool_settings = data.get('settings', {}).get('smart_pool', {}) or {}
+            sources_data = data.get('sources') or []
+            smart_pool_settings = (data.get('settings') or {}).get('smart_pool', {}) or {}
     except Exception as e:
         logger.error(f"Failed to read {sources_file}: {e}")
         return
@@ -44,7 +44,7 @@ async def main():
         try:
             with open(local_priv_file, 'r', encoding='utf-8') as f:
                 lp_data = yaml.safe_load(f) or {}
-                lp_sources = lp_data if isinstance(lp_data, list) else lp_data.get('sources', [])
+                lp_sources = lp_data if isinstance(lp_data, list) else (lp_data.get('sources') or [])
                 for p in lp_sources:
                     if isinstance(p, dict):
                         p['is_private'] = True
@@ -134,13 +134,7 @@ async def main():
         
         # 5. Update README (统一更新顶部徽章、地区统计表与各源贡献度明细)
         try:
-            source_stats = []
-            for item in raw_source_results:
-                valid_nodes = processor.filter_invalid(item.get('nodes', []))
-                source_stats.append({
-                    'name': item.get('name', '未命名源'),
-                    'valid_count': len(valid_nodes)
-                })
+            source_stats = prepare_source_stats(raw_source_results, processor=processor)
             update_readme_all(gen_stats, source_stats, now=now)
         except Exception as e:
             logger.warning(f"Failed to update README stats table: {e}")
