@@ -8,7 +8,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Telegram Channel](https://img.shields.io/badge/Telegram-频道交流-26A5E4?style=flat-square&logo=telegram&logoColor=white)](https://t.me/MetaFetchNodes)
 <!-- STATS_BADGE_START -->
-![Update](https://img.shields.io/badge/Updated-2026-10-16--08%3A43%3A01-green.svg?style=flat-square)
+![Update](https://img.shields.io/badge/Updated-2026-10-16--09%3A00%3A53-green.svg?style=flat-square)
 ![Nodes](https://img.shields.io/badge/Valid_Nodes-926-orange.svg?style=flat-square)
 ![Sources](https://img.shields.io/badge/Active_Sources-10-blue.svg?style=flat-square)
 <!-- STATS_BADGE_END -->
@@ -104,8 +104,8 @@
 ## 📊 节点分布统计
 
 <!-- STATS_TABLE_START -->
-> 更新时间：`2026-10-16 08:43:01`
-> 运行分析：从 `10` 个活跃源中抓取 `1577` 个节点，耗时 `0.84s`。去重后保留 `926` 个有效节点。
+> 更新时间：`2026-10-16 09:00:53`
+> 运行分析：从 `10` 个活跃源中抓取 `1577` 个节点，耗时 `0.53s`。去重后保留 `926` 个有效节点。
 
 <div style="overflow-x: auto;">
 
@@ -121,7 +121,7 @@
 <!-- SOURCE_STATS_TABLE_START -->
 ### 📡 各订阅源贡献度明细
 
-> 数据计算时间：`2026-10-16 08:43:00`
+> 数据计算时间：`2026-10-16 09:00:52`
 
 <table width="100%"><tr><td>
 
