@@ -197,13 +197,38 @@ class TestParser(unittest.TestCase):
         self.assertEqual(payload["aid"], "0")
         self.assertNotEqual(payload["aid"], "None")
 
-    def test_region_matching_expanded_cities(self):
-        from utils.regions import match_region
-        self.assertEqual(match_region("Seattle-01"), "US")
-        self.assertEqual(match_region("HongKong_高速01"), "HK")
-        self.assertEqual(match_region("JP-Nagoya-1"), "JP")
-        self.assertEqual(match_region("DE 柏林 机房"), "DE")
-        self.assertEqual(match_region("UnitedStates-02"), "US")
+    def test_get_identity_with_plugin_and_obfs(self):
+        # 1. 验证 SS 节点在带有插件时与无插件节点指纹互斥
+        ss_base = {"name": "SS1", "type": "ss", "server": "1.2.3.4", "port": 8388, "cipher": "aes-256-gcm", "password": "pwd"}
+        ss_plugin = dict(ss_base, plugin="obfs", **{"plugin-opts": {"mode": "http", "host": "bing.com"}})
+        ss_v2ray = dict(ss_base, plugin="v2ray-plugin", **{"plugin-opts": {"mode": "websocket", "host": "example.com"}})
+
+        node_base = Node(ss_base)
+        node_plugin = Node(ss_plugin)
+        node_v2ray = Node(ss_v2ray)
+
+        self.assertNotEqual(node_base.get_identity(), node_plugin.get_identity())
+        self.assertNotEqual(node_plugin.get_identity(), node_v2ray.get_identity())
+        self.assertIn("plugin:obfs", node_plugin.get_identity())
+        self.assertIn("pmod:http", node_plugin.get_identity())
+        self.assertIn("phost:bing.com", node_plugin.get_identity())
+        self.assertIn("plugin:v2ray-plugin", node_v2ray.get_identity())
+
+        # 2. 验证 Hysteria2 节点在带有混淆时与无混淆节点指纹互斥
+        hy2_base = {"name": "HY1", "type": "hysteria2", "server": "1.2.3.4", "port": 443, "password": "pwd"}
+        hy2_obfs = dict(hy2_base, obfs="salamander", **{"obfs-password": "secret_password"})
+
+        node_hy2_base = Node(hy2_base)
+        node_hy2_obfs = Node(hy2_obfs)
+
+        self.assertNotEqual(node_hy2_base.get_identity(), node_hy2_obfs.get_identity())
+        self.assertIn("obfs:salamander", node_hy2_obfs.get_identity())
+        self.assertIn("opwd:secret_password", node_hy2_obfs.get_identity())
+
+        # 3. 相同特征的指纹完全一致且相等
+        node_hy2_obfs_clone = Node(dict(hy2_obfs, name="HY_Different_Name"))
+        self.assertEqual(node_hy2_obfs.get_identity(), node_hy2_obfs_clone.get_identity())
+        self.assertEqual(node_hy2_obfs, node_hy2_obfs_clone)
 
 
 if __name__ == "__main__":

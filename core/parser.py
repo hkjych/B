@@ -461,6 +461,26 @@ class Node:
         if flow:
             ident_parts.append(f"flow:{flow}")
 
+        # 7. 插件与混淆特征 (plugin / obfs，避免带混淆与不带混淆的节点被误去重)
+        plugin = self.data.get('plugin')
+        if plugin:
+            ident_parts.append(f"plugin:{str(plugin).lower()}")
+            popts = self.data.get('plugin-opts') or {}
+            if isinstance(popts, dict):
+                p_mode = popts.get('mode')
+                p_host = popts.get('host')
+                if p_mode:
+                    ident_parts.append(f"pmod:{str(p_mode).lower()}")
+                if p_host:
+                    ident_parts.append(f"phost:{str(p_host).lower()}")
+
+        obfs = self.data.get('obfs')
+        if obfs:
+            ident_parts.append(f"obfs:{str(obfs).lower()}")
+            obfs_pwd = self.data.get('obfs-password')
+            if obfs_pwd:
+                ident_parts.append(f"opwd:{obfs_pwd}")
+
         return ":".join(ident_parts)
 
     def __hash__(self):

@@ -87,15 +87,9 @@
 - **涉及文件**：`core/parser.py` L100-112, `tests/test_parser.py`
 - **完成情况**：支持布尔值 `True`、数字 `1` 以及大小写字符串 `tls`/`TLS`/`true`；同时对 `net` 字段（`ws`/`grpc`）增加 `.lower()` 规范化处理；新增 `test_node_from_vmess_tls_compatibility` 覆盖 14 种 TLS 开启与关闭测试用例全部通过。
 
-### 2.3 `get_identity()` 补充 plugin/obfs 信息
-- **涉及文件**：`core/parser.py` L414-456
-- **修改**：在 `ident_parts` 末尾追加：
-  ```python
-  if self.data.get('plugin'):
-      ident_parts.append(f"plugin:{self.data['plugin']}")
-  if self.data.get('obfs'):
-      ident_parts.append(f"obfs:{self.data['obfs']}")
-  ```
+### 2.3 `get_identity()` 补充 plugin/obfs 信息 [✅ 已完成]
+- **涉及文件**：`core/parser.py` L464-483, `tests/test_parser.py`
+- **完成情况**：在 `ident_parts` 中细致引入 `plugin`（包含 `pmod` 模式与 `phost` 伪装域名）以及 `obfs`（包含混淆密码 `opwd`）特征维度，彻底避免带混淆/插件与普通节点被误判去重；新增 `test_get_identity_with_plugin_and_obfs` 单元测试全部通过。
 
 ### 2.4 精选池容量逻辑修正
 - **涉及文件**：`core/generator.py` L356-380
