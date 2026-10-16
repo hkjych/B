@@ -91,14 +91,9 @@
 - **涉及文件**：`core/parser.py` L464-483, `tests/test_parser.py`
 - **完成情况**：在 `ident_parts` 中细致引入 `plugin`（包含 `pmod` 模式与 `phost` 伪装域名）以及 `obfs`（包含混淆密码 `opwd`）特征维度，彻底避免带混淆/插件与普通节点被误判去重；新增 `test_get_identity_with_plugin_and_obfs` 单元测试全部通过。
 
-### 2.4 精选池容量逻辑修正
-- **涉及文件**：`core/generator.py` L356-380
-- **修改**：将 `max_pool_size` 截断移至所有补齐/兜底逻辑**之后**作为最终步骤：
-  ```python
-  # 所有填充和兜底完成后，再做最终截断
-  if max_pool_size != float('inf') and len(smart_pool_nodes) > int(max_pool_size):
-      smart_pool_nodes = smart_pool_nodes[:int(max_pool_size)]
-  ```
+### 2.4 精选池容量逻辑修正 [✅ 已完成]
+- **涉及文件**：`core/generator.py` L350-390, `tests/test_generator.py`
+- **完成情况**：将全局最大容量 `max_pool_size` 的截断逻辑下沉移至 `min_pool_size` 补齐与极端兜底之后作为最终把关道闸，并优先保全私有节点，杜绝任何兜底分支将海量节点灌入自动测速组引发测速风暴；新增 `test_generator_max_pool_size_strict_cap_after_fallback` 单元测试全部通过。
 
 ### 2.5 私有中国节点过滤修正
 - **涉及文件**：`core/generator.py` L255

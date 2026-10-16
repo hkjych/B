@@ -351,16 +351,7 @@ class Generator:
         # 3. 编排 Smart Pool: 私有节点置顶，公共节点紧随其后作为容灾兜底
         smart_pool_nodes = priv_selected + pub_selected
 
-        # 4. 全局最大容量截断 (防测速风暴，优先保全私有节点)
-        if max_pool_size != float('inf') and len(smart_pool_nodes) > max_pool_size:
-            max_limit_int = int(max_pool_size)
-            if len(priv_selected) >= max_limit_int:
-                smart_pool_nodes = priv_selected[:max_limit_int]
-            else:
-                remain_slots = max_limit_int - len(priv_selected)
-                smart_pool_nodes = priv_selected + pub_selected[:remain_slots]
-
-        # 5. 保底补充 (min_pool_size): 若节点过少，从公共海外全量节点按质量补齐
+        # 4. 保底补充 (min_pool_size): 若节点过少，从公共海外全量节点按质量补齐
         pub_oversea_nodes = [
             n for n in node_names
             if not is_china_node(n) and not node_obj_map[n].data.get('_is_private')
@@ -377,6 +368,16 @@ class Generator:
         if not smart_pool_nodes:
             oversea_all = [n for n in node_names if not is_china_node(n)]
             smart_pool_nodes = pub_oversea_nodes if pub_oversea_nodes else (oversea_all if oversea_all else node_names)
+
+        # 5. 全局最大容量最终截断 (防测速风暴，优先保全私有节点)
+        if max_pool_size != float('inf') and len(smart_pool_nodes) > int(max_pool_size):
+            max_limit_int = int(max_pool_size)
+            priv_in_pool = [n for n in smart_pool_nodes if node_obj_map.get(n) and node_obj_map[n].data.get('_is_private')]
+            pub_in_pool = [n for n in smart_pool_nodes if not (node_obj_map.get(n) and node_obj_map[n].data.get('_is_private'))]
+            if len(priv_in_pool) >= max_limit_int:
+                smart_pool_nodes = priv_in_pool[:max_limit_int]
+            else:
+                smart_pool_nodes = priv_in_pool + pub_in_pool[:(max_limit_int - len(priv_in_pool))]
 
         # 6. Fill Template Groups
         template_groups = config.get('proxy-groups', [])

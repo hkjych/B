@@ -195,5 +195,41 @@ class TestGenerator(unittest.TestCase):
             self.assertNotIn("\x87", raw_yaml)
             self.assertIn("evilhost.com", raw_yaml)
 
+    def test_generator_max_pool_size_strict_cap_after_fallback(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template_path = os.path.join(tmpdir, "config.yaml")
+            output_path = os.path.join(tmpdir, "output.yaml")
+            with open(template_path, "w", encoding="utf-8") as f:
+                yaml.safe_dump(self.template_data, f)
+
+            # 构造 20 个公共节点，均不属于 core_regions (比如均为未知/其它地区)，使得初筛 pub_selected 可能无法填满或为空
+            nodes = [
+                Node({"name": f"🏳️ 其它节点_{i}", "type": "ss", "server": f"8.8.8.{i+1}", "port": 443})
+                for i in range(20)
+            ]
+
+            # 配置 max_pool_size 为 5，但 core/other 配额很小或触发了 fallback 补充
+            pool_settings = {
+                "core_regions": ["HK", "JP", "US"],
+                "public": {
+                    "core_per_region": 1,
+                    "other_per_region": 0  # other 初筛为 0
+                },
+                "min_pool_size": 20,       # 故意设置大于 max_pool_size，要求补齐到 20 个
+                "max_pool_size": 5         # 但硬性最大上限为 5
+            }
+
+            generator = Generator(template_path, pool_settings=pool_settings)
+            generator.generate(nodes, output_path)
+
+            with open(output_path, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f)
+
+            groups = {g["name"]: g for g in cfg["proxy-groups"]}
+            auto_proxies = groups["♻️ 自动选择"]["proxies"]
+
+            # 验证即使 fallback 兜底补齐尝试追加全部 20 个节点，最终进入自动选择的节点数也严格 <= 5
+            self.assertEqual(len(auto_proxies), 5)
+
 if __name__ == "__main__":
     unittest.main()
