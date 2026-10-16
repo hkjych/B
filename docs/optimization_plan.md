@@ -79,9 +79,9 @@
 
 ## 阶段二：🟠 P1 功能性 Bug 修复
 
-### 2.1 SS 节点 URL 尾部斜杠处理
-- **涉及文件**：`core/parser.py` L150-156
-- **修改**：解析 `serverinfo` 前 `serverinfo = serverinfo.rstrip('/')`
+### 2.1 SS 节点 URL 尾部斜杠处理 [✅ 已完成]
+- **涉及文件**：`core/parser.py` L148-156, `tests/test_parser.py`
+- **完成情况**：解析 `serverinfo` 前增加 `.strip().split('/')[0].strip()` 剥离斜杠和路径，增强 IPv6/插件及全量 Base64 尾部斜杠容错；新增 `test_node_from_ss_url_with_trailing_slash` 4 组单元测试全部通过。
 
 ### 2.2 VMess TLS 字段兼容
 - **涉及文件**：`core/parser.py` L109

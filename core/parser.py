@@ -147,11 +147,13 @@ class Node:
                 
                 if ':' in userinfo and ':' in serverinfo:
                     cipher, password = userinfo.split(':', 1)
+                    # 剥离可能存在的路径/斜杠（例如 server:port/ 或 server:port/path）
+                    serverinfo = serverinfo.strip().split('/')[0].strip()
                     # 处理可能带端口的 serverinfo（支持 IPv6 [::1]:port）
                     server, port_str = serverinfo.rsplit(':', 1)
                     server = server.strip('[]')
                     try:
-                        port_val = int(port_str)
+                        port_val = int(port_str.strip())
                     except (ValueError, TypeError):
                         port_val = 0
                     

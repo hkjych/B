@@ -51,6 +51,40 @@ class TestParser(unittest.TestCase):
         self.assertEqual(node.data["server"], "1.2.3.4")
         self.assertEqual(node.data["cipher"], "aes-256-gcm")
         self.assertEqual(node.data["password"], "password123")
+        self.assertEqual(node.data["port"], 8388)
+
+    def test_node_from_ss_url_with_trailing_slash(self):
+        userinfo = b64encodes("aes-256-gcm:password123")
+        
+        # 1. 尾部直接带斜杠: server:port/#name
+        url1 = f"ss://{userinfo}@1.2.3.4:8388/#Node_Slash"
+        node1 = Node(url1)
+        self.assertEqual(node1.type, "ss")
+        self.assertEqual(node1.data["port"], 8388)
+        self.assertEqual(node1.data["server"], "1.2.3.4")
+
+        # 2. 带 query 参数并在 query 前带斜杠: server:port/?plugin=...#name
+        url2 = f"ss://{userinfo}@1.2.3.4:8388/?plugin=obfs-local#Node_Query_Slash"
+        node2 = Node(url2)
+        self.assertEqual(node2.type, "ss")
+        self.assertEqual(node2.data["port"], 8388)
+        self.assertEqual(node2.data["server"], "1.2.3.4")
+        self.assertEqual(node2.data.get("plugin"), "obfs")
+
+        # 3. 整串 Base64 解码后带斜杠 (SIP002 标准)
+        b64_full = b64encodes("aes-256-gcm:password123@1.2.3.4:8388/")
+        url3 = f"ss://{b64_full}#Node_Full_B64_Slash"
+        node3 = Node(url3)
+        self.assertEqual(node3.type, "ss")
+        self.assertEqual(node3.data["port"], 8388)
+        self.assertEqual(node3.data["server"], "1.2.3.4")
+
+        # 4. IPv6 地址带斜杠: [2001:db8::1]:8388/#name
+        url4 = f"ss://{userinfo}@[2001:db8::1]:8388/#Node_IPv6_Slash"
+        node4 = Node(url4)
+        self.assertEqual(node4.type, "ss")
+        self.assertEqual(node4.data["port"], 8388)
+        self.assertEqual(node4.data["server"], "2001:db8::1")
 
     def test_node_from_trojan_url(self):
         trojan_url = "trojan://password123@1.2.3.4:443?sni=example.com#Node_Trojan_Test"
