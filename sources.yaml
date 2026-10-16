@@ -82,9 +82,13 @@ sources:
     url: "https://raw.githubusercontent.com/Pawdroid/Free-servers/main/sub"
     note: "移动端精选"
 
-  - name: "📡 shaoyouvip 每日更新"
-    url: "https://raw.githubusercontent.com/shaoyouvip/free/main/all.yaml"
-    note: "每日更新补充"
+  - name: "📡 shaoyouvip 每日实测"
+    url: "https://raw.githubusercontent.com/shaoyouvip/free/main/base64.txt"
+    note: "每日实测测速更新 (纯净 VLESS)"
+
+  - name: "🏆 huiwin NodeCollection (4h 自动测速清洗)"
+    url: "https://raw.githubusercontent.com/huiwin/NodeCollection/main/output/clash/latest.yaml"
+    note: "全协议覆盖，每 4 小时多线程连通与测速清洗"
 
   # ==========================================
   # 💤 备选休眠源 (默认关闭，需要时设 enabled: true)
