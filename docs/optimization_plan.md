@@ -99,15 +99,9 @@
 - **涉及文件**：`core/generator.py` L255, `tests/test_generator.py`
 - **完成情况**：将 `is_china_node(name)` 中针对国旗的判断修正为 `'🇨🇳' in name`，确保被冠以 `👑 ` 标识的私有中国境内节点能够被精准识别并坚决排除出 `♻️ 自动选择` / `🔰 延迟最低` 精选测速池（同时完整保留于专属的 `👑 私有节点` 组内）；新增 `test_generator_private_china_node_excluded_from_smart_pool` 单元测试全部通过。
 
-### 2.6 Base64 解码后增加协议过滤
-- **涉及文件**：`core/fetcher.py` L229-234
-- **修改**：
-  ```python
-  for line in lines:
-      line_s = line.strip()
-      if line_s and line_s.lower().startswith(ALLOWED_PROTOCOLS):
-          nodes.append(Node(line_s))
-  ```
+### 2.6 Base64 解码后增加协议过滤 [✅ 已完成]
+- **涉及文件**：`core/fetcher.py` L229-237, `tests/test_fetcher.py`
+- **完成情况**：在 Base64 解码后的逐行处理中严格执行 `ALLOWED_PROTOCOLS` 白名单前缀过滤，有效拦截订阅列表中掺杂的 Telegram 广告、公告说明与 HTTP 非代理杂质文本，杜绝畸形 Node 对象实例化及潜在解析异常；新增 `test_parse_content_base64_protocol_filter_ignores_ads_and_text` 单元测试全部通过。
 
 ### 2.7 `main.py` 空配置防御
 - **涉及文件**：`main.py` L31, L46-51
