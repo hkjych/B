@@ -32,6 +32,32 @@ class TestParser(unittest.TestCase):
         self.assertEqual(clash_cfg["type"], "vmess")
         self.assertEqual(clash_cfg["server"], "1.2.3.4")
         self.assertEqual(clash_cfg["uuid"], "a0000000-0000-0000-0000-000000000000")
+        self.assertTrue(clash_cfg["tls"])
+
+    def test_node_from_vmess_tls_compatibility(self):
+        base_dict = {
+            "v": "2",
+            "ps": "VMess_TLS_Test",
+            "add": "1.2.3.4",
+            "port": "443",
+            "id": "a0000000-0000-0000-0000-000000000000",
+            "net": "WS",
+            "path": "/ws"
+        }
+
+        # 1. 各种代表开启 TLS 的取值
+        for val in ("tls", "TLS", "true", "True", True, "1", 1):
+            d = dict(base_dict, tls=val)
+            node = Node("vmess://" + b64encodes(json.dumps(d)))
+            self.assertTrue(node.data["tls"], f"Failed for tls={repr(val)}")
+            self.assertEqual(node.data["network"], "ws")
+            self.assertIn("ws-opts", node.data)
+
+        # 2. 各种代表未开启 TLS 的取值
+        for val in ("", "none", "false", False, "0", 0, None):
+            d = dict(base_dict, tls=val)
+            node = Node("vmess://" + b64encodes(json.dumps(d)))
+            self.assertFalse(node.data["tls"], f"Failed for tls={repr(val)}")
 
     def test_node_from_vless_url(self):
         vless_url = "vless://a0000000-0000-0000-0000-000000000000@1.2.3.4:443?encryption=none&security=reality&sni=yahoo.com&fp=chrome&pbk=123456&type=tcp#Node_Vless_Test"

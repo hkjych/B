@@ -83,12 +83,9 @@
 - **涉及文件**：`core/parser.py` L148-156, `tests/test_parser.py`
 - **完成情况**：解析 `serverinfo` 前增加 `.strip().split('/')[0].strip()` 剥离斜杠和路径，增强 IPv6/插件及全量 Base64 尾部斜杠容错；新增 `test_node_from_ss_url_with_trailing_slash` 4 组单元测试全部通过。
 
-### 2.2 VMess TLS 字段兼容
-- **涉及文件**：`core/parser.py` L109
-- **修改**：
-  ```python
-  'tls': str(v.get('tls', '')).strip().lower() in ('tls', 'true', '1') or v.get('tls') is True,
-  ```
+### 2.2 VMess TLS 字段兼容 [✅ 已完成]
+- **涉及文件**：`core/parser.py` L100-112, `tests/test_parser.py`
+- **完成情况**：支持布尔值 `True`、数字 `1` 以及大小写字符串 `tls`/`TLS`/`true`；同时对 `net` 字段（`ws`/`grpc`）增加 `.lower()` 规范化处理；新增 `test_node_from_vmess_tls_compatibility` 覆盖 14 种 TLS 开启与关闭测试用例全部通过。
 
 ### 2.3 `get_identity()` 补充 plugin/obfs 信息
 - **涉及文件**：`core/parser.py` L414-456

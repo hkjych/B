@@ -97,6 +97,12 @@ class Node:
             aid_raw = v.get('aid')
             aid_val = int(aid_raw) if aid_raw not in (None, '') else 0
 
+            tls_raw = v.get('tls')
+            is_tls = str(tls_raw or '').strip().lower() in ('tls', 'true', '1') or tls_raw is True
+            net_val = str(v.get('net') or 'tcp').strip().lower()
+            if not net_val:
+                net_val = 'tcp'
+
             self.data = {
                 'name': v.get('ps', 'vmess'),
                 'server': v.get('add'),
@@ -105,17 +111,17 @@ class Node:
                 'uuid': v.get('id'),
                 'alterId': aid_val,
                 'cipher': cipher,
-                'network': v.get('net', 'tcp'),
-                'tls': v.get('tls') == 'tls',
+                'network': net_val,
+                'tls': is_tls,
                 'sni': v.get('sni'),
                 'udp': True
             }
-            if v.get('net') == 'ws':
+            if net_val == 'ws':
                 self.data['ws-opts'] = {
                     'path': v.get('path', '/'),
                     'headers': {'Host': v.get('host', '')}
                 }
-            elif v.get('net') == 'grpc':
+            elif net_val == 'grpc':
                 self.data['grpc-opts'] = {'grpc-service-name': v.get('path', '')}
         except Exception:
             pass
