@@ -63,8 +63,7 @@ class Fetcher:
             self.client = None
 
     async def fetch_nodes(self, url: str, filters: Optional[Dict[str, Any]] = None, is_private: bool = False) -> List[Node]:
-        async with self.semaphore:
-            return await self._fetch_nodes_internal(url, filters, is_private=is_private)
+        return await self._fetch_nodes_internal(url, filters, is_private=is_private)
 
     async def _fetch_nodes_internal(self, url: str, filters: Optional[Dict[str, Any]] = None, is_private: bool = False) -> List[Node]:
         is_recursive = url.startswith('*')
@@ -107,7 +106,8 @@ class Fetcher:
                 for target_url in targets:
                     try:
                         logger.debug(f"Fetching: {target_url}")
-                        response = await client.get(target_url, timeout=self.req_timeout)
+                        async with self.semaphore:
+                            response = await client.get(target_url, timeout=self.req_timeout)
                         if response.status_code == 200:
                             text = response.content.decode('utf-8-sig', errors='ignore')
                             # 识别假 200（如反代 404/502 HTML、Cloudflare 质询页）

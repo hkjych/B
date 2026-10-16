@@ -70,13 +70,10 @@
   ```
   同时考虑移除冗余的 `b64decodes_safe`
 
-### 1.6 递归抓取信号量下沉
+### 1.6 递归抓取信号量下沉 [✅ 已完成]
 - **问题**：父任务持有信号量等待子任务，子任务又争抢同一信号量 → 死锁
-- **涉及文件**：`core/fetcher.py` L65-67, L144-145
-- **修改方案**：
-  1. `fetch_nodes` 去掉 `async with self.semaphore` 包裹
-  2. 信号量下沉到底层 `_do_http_get`（实际发起 HTTP 请求的方法）
-  3. 或改为递归子任务直接调用 `_fetch_nodes_internal`（绕过信号量）
+- **涉及文件**：`core/fetcher.py` L65-67, L108-110, `tests/test_fetcher.py`
+- **完成情况**：`fetch_nodes` 移除外层 `self.semaphore`，下沉至底层 `client.get` 网络请求，新增 `test_recursive_fetch_semaphore_no_deadlock` 单元测试验证零死锁。
 
 ---
 
