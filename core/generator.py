@@ -252,7 +252,7 @@ class Generator:
         def is_china_node(name: str) -> bool:
             """判断是否为中国境内节点，对 CN2-GIA / IPLC 等海外中转线路进行白名单豁免"""
             reg = node_to_region.get(name, '')
-            if reg == 'CN' or name.startswith('🇨🇳'):
+            if reg == 'CN' or '🇨🇳' in name:
                 upper_name = name.upper()
                 if any(tag in upper_name for tag in ('CN2', 'CNIX', 'CN-TRANSIT', 'IPLC', 'BGP-CN')):
                     if any(flag in name for flag in ('🇭🇰', '🇯🇵', '🇺🇸', '🇸🇬', '🇰🇷', '🇩🇪', '🇬🇧', 'HK', 'JP', 'US', 'SG', 'TW')):

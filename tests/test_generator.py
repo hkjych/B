@@ -231,5 +231,45 @@ class TestGenerator(unittest.TestCase):
             # 验证即使 fallback 兜底补齐尝试追加全部 20 个节点，最终进入自动选择的节点数也严格 <= 5
             self.assertEqual(len(auto_proxies), 5)
 
+    def test_generator_private_china_node_excluded_from_smart_pool(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template_path = os.path.join(tmpdir, "config.yaml")
+            output_path = os.path.join(tmpdir, "output.yaml")
+            with open(template_path, "w", encoding="utf-8") as f:
+                yaml.safe_dump(self.template_data, f)
+
+            # 私有中国节点 (带 👑 和 🇨🇳 前缀，模拟已清洗重命名后的私有节点)
+            cn_priv = Node({"name": "👑 🇨🇳 私有上海直连", "type": "ss", "server": "114.114.114.114", "port": 443})
+            cn_priv.data['_is_private'] = True
+
+            # 私有海外节点
+            hk_priv = Node({"name": "👑 🇭🇰 私有香港高速", "type": "ss", "server": "1.1.1.1", "port": 443})
+            hk_priv.data['_is_private'] = True
+
+            # 公共海外节点
+            us_pub = Node({"name": "🇺🇸 公共美国01", "type": "trojan", "server": "8.8.8.8", "port": 443})
+
+            generator = Generator(template_path)
+            generator.generate([cn_priv, hk_priv, us_pub], output_path)
+
+            with open(output_path, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f)
+
+            groups = {g["name"]: g for g in cfg["proxy-groups"]}
+            auto_proxies = groups["♻️ 自动选择"]["proxies"]
+            lowest_proxies = groups["🔰 延迟最低"]["proxies"]
+            private_proxies = groups["👑 私有节点"]["proxies"]
+
+            # 1. 验证私有中国节点坚决不进 ♻️ 自动选择 和 🔰 延迟最低
+            self.assertNotIn("👑 🇨🇳 私有上海直连", auto_proxies)
+            self.assertNotIn("👑 🇨🇳 私有上海直连", lowest_proxies)
+
+            # 2. 验证私有海外节点正常进入 ♻️ 自动选择
+            self.assertIn("👑 🇭🇰 私有香港高速", auto_proxies)
+
+            # 3. 验证私有中国节点仍完整保留在 👑 私有节点 策略组供专属需要时选择
+            self.assertIn("👑 🇨🇳 私有上海直连", private_proxies)
+
 if __name__ == "__main__":
     unittest.main()
+

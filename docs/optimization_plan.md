@@ -95,9 +95,9 @@
 - **涉及文件**：`core/generator.py` L350-390, `tests/test_generator.py`
 - **完成情况**：将全局最大容量 `max_pool_size` 的截断逻辑下沉移至 `min_pool_size` 补齐与极端兜底之后作为最终把关道闸，并优先保全私有节点，杜绝任何兜底分支将海量节点灌入自动测速组引发测速风暴；新增 `test_generator_max_pool_size_strict_cap_after_fallback` 单元测试全部通过。
 
-### 2.5 私有中国节点过滤修正
-- **涉及文件**：`core/generator.py` L255
-- **修改**：`name.startswith('🇨🇳')` → `'🇨🇳' in name`
+### 2.5 私有中国节点过滤修正 [✅ 已完成]
+- **涉及文件**：`core/generator.py` L255, `tests/test_generator.py`
+- **完成情况**：将 `is_china_node(name)` 中针对国旗的判断修正为 `'🇨🇳' in name`，确保被冠以 `👑 ` 标识的私有中国境内节点能够被精准识别并坚决排除出 `♻️ 自动选择` / `🔰 延迟最低` 精选测速池（同时完整保留于专属的 `👑 私有节点` 组内）；新增 `test_generator_private_china_node_excluded_from_smart_pool` 单元测试全部通过。
 
 ### 2.6 Base64 解码后增加协议过滤
 - **涉及文件**：`core/fetcher.py` L229-234
