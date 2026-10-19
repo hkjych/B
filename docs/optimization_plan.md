@@ -115,9 +115,9 @@
 
 ## 阶段三：🟡 P2 健壮性加固
 
-### 3.1 IPv6 回环地址过滤补全
-- **涉及文件**：`core/processor.py` L46-49
-- **修改**：检查前 `n_server = n_server.strip('[]')`，并在 `INVALID_SERVERS` 中补充 `'[::1]'`
+### 3.1 IPv6 回环地址过滤补全 [✅ 已完成]
+- **涉及文件**：`core/processor.py` L47-50, L138, `tests/test_processor.py`
+- **完成情况**：在 `INVALID_SERVERS` 黑名单中补齐了 `'[::1]'`, `'::'`, `'[::]'`，并在 `filter_invalid()` 中对服务器地址执行 `strip('[]')` 预处理，彻底过滤各种带括号/裸写的 IPv6 回环及未指定地址假节点，同时确保合法外网 IPv6 节点不受影响；在 `test_processor_filter_invalid_servers` 补充针对性单测全部通过。
 
 ### 3.2 SNI 字段统一
 - **涉及文件**：`core/parser.py` 多处 `_load_*` 和 `to_url()`

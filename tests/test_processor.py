@@ -8,15 +8,20 @@ class TestProcessor(unittest.TestCase):
         processor = NodeProcessor()
         nodes = [
             Node({"name": "Node_Valid", "type": "vmess", "server": "1.2.3.4", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
+            Node({"name": "Node_Valid_IPv6", "type": "vmess", "server": "[2606:4700:4700::1111]", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
             Node({"name": "Node_Loopback1", "type": "vmess", "server": "127.0.0.1", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
             Node({"name": "Node_Loopback2", "type": "vmess", "server": "0.0.0.0", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
             Node({"name": "Node_Localhost", "type": "vmess", "server": "localhost", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
+            Node({"name": "Node_IPv6_Loopback_Bracket", "type": "vmess", "server": "[::1]", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
+            Node({"name": "Node_IPv6_Loopback_Plain", "type": "vmess", "server": "::1", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
+            Node({"name": "Node_IPv6_Zero_Bracket", "type": "vmess", "server": "[::]", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
             Node({"name": "Node_NoUUID", "type": "vmess", "server": "1.2.3.4", "port": 443}),
             Node({"name": "Node_BadPort", "type": "vmess", "server": "1.2.3.4", "port": -1, "uuid": "a0000000-0000-0000-0000-000000000000"}),
         ]
         valid = processor.filter_invalid(nodes)
-        self.assertEqual(len(valid), 1)
-        self.assertEqual(valid[0].name, "Node_Valid")
+        self.assertEqual(len(valid), 2)
+        valid_names = {n.name for n in valid}
+        self.assertEqual(valid_names, {"Node_Valid", "Node_Valid_IPv6"})
 
     def test_processor_deduplicate(self):
         processor = NodeProcessor()

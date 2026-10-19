@@ -45,7 +45,7 @@ GROUP_NAMES.update({'🚀 选择代理', '🗺️ 选择地区', '♻️ 自动�
 
 # 无效与回环 server 过滤黑名单
 INVALID_SERVERS = {
-    '0.0.0.0', '127.0.0.1', 'localhost', '::1', '1.1.1.1',
+    '0.0.0.0', '127.0.0.1', 'localhost', '::1', '[::1]', '::', '[::]', '1.1.1.1',
     'example.com', 'test.com', 'none', 'null', 'undefined'
 }
 
@@ -134,8 +134,9 @@ class NodeProcessor:
                 if n_type not in ALLOWED_TYPES or not n_server:
                     continue
 
-                # 过滤回环、占位或非法 server 地址
-                if n_server.lower() in INVALID_SERVERS or any(c in n_server for c in (' ', '\n', '\r', '\t')):
+                # 过滤回环、占位或非法 server 地址 (去除方括号兼容 IPv6 回环，如 [::1])
+                clean_server = n_server.lower().strip('[]')
+                if clean_server in INVALID_SERVERS or n_server.lower() in INVALID_SERVERS or any(c in n_server for c in (' ', '\n', '\r', '\t')):
                     continue
 
                 # 2. 验证 port 必须为有效端口 (1-65535)
