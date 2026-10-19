@@ -230,6 +230,40 @@ class TestParser(unittest.TestCase):
         self.assertEqual(node_hy2_obfs.get_identity(), node_hy2_obfs_clone.get_identity())
         self.assertEqual(node_hy2_obfs, node_hy2_obfs_clone)
 
+    def test_sni_and_servername_unification(self):
+        # 1. VLESS: sni 与 servername 双向同步且 to_url 完整导出
+        vless_dict = {
+            "name": "Vless_SNI", "type": "vless", "server": "1.2.3.4", "port": 443,
+            "uuid": "a0000000-0000-0000-0000-000000000000", "tls": True, "sni": "vless.example.com"
+        }
+        node_vless = Node(vless_dict)
+        self.assertEqual(node_vless.data["sni"], "vless.example.com")
+        self.assertEqual(node_vless.data["servername"], "vless.example.com")
+        self.assertIn("sni=vless.example.com", node_vless.to_url())
+
+        # 2. Trojan: 输入 servername 自动同步至 sni 并在 to_url 导出
+        trojan_dict = {
+            "name": "Trojan_Servername", "type": "trojan", "server": "1.2.3.4", "port": 443,
+            "password": "pwd", "servername": "trojan.example.com"
+        }
+        node_trojan = Node(trojan_dict)
+        self.assertEqual(node_trojan.data["sni"], "trojan.example.com")
+        self.assertIn("sni=trojan.example.com", node_trojan.to_url())
+
+        # 3. Hysteria2: 输入 servername 自动同步并在 to_url 导出
+        hy2_dict = {
+            "name": "HY2_SNI", "type": "hysteria2", "server": "1.2.3.4", "port": 443,
+            "password": "pwd", "servername": "hy2.example.com"
+        }
+        node_hy2 = Node(hy2_dict)
+        self.assertEqual(node_hy2.data["sni"], "hy2.example.com")
+        self.assertIn("sni=hy2.example.com", node_hy2.to_url())
+
+        # 4. 指纹对齐：采用 sni 还是 servername 生成的去重指纹完全一致
+        node_trojan_sni = Node(dict(trojan_dict, sni="trojan.example.com", servername=None))
+        self.assertEqual(node_trojan.get_identity(), node_trojan_sni.get_identity())
+
 
 if __name__ == "__main__":
     unittest.main()
+

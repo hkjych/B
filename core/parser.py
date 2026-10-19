@@ -85,6 +85,13 @@ class Node:
                         ropts.pop('short-id', None)
                         ropts.pop('shortId', None)
 
+        # 3. 规范化 SNI 与 servername 字段 (双向同步，消除协议间字段命名不一致)
+        sni_val = self.data.get('sni') or self.data.get('servername')
+        if sni_val:
+            self.data['sni'] = str(sni_val).strip()
+            if self.type == 'vless':
+                self.data['servername'] = self.data['sni']
+
     def _load_vmess(self, url: str, dt: str):
         try:
             content = b64decodes(dt)
@@ -113,7 +120,7 @@ class Node:
                 'cipher': cipher,
                 'network': net_val,
                 'tls': is_tls,
-                'sni': v.get('sni'),
+                'sni': v.get('sni') or v.get('servername'),
                 'udp': True
             }
             if net_val == 'ws':
@@ -225,7 +232,8 @@ class Node:
             # Query params
             if parsed.query:
                 params = dict(parse_qsl(parsed.query))
-                if 'sni' in params: self.data['sni'] = params['sni']
+                sni_val = params.get('sni') or params.get('servername') or params.get('peer')
+                if sni_val: self.data['sni'] = sni_val
                 if 'allowInsecure' in params: self.data['skip-cert-verify'] = params['allowInsecure'] == '1'
                 if 'security' in params:
                     if params['security'] == 'none':
@@ -259,7 +267,10 @@ class Node:
             }
             if parsed.query:
                 params = dict(parse_qsl(parsed.query))
-                if 'sni' in params: self.data['servername'] = params['sni']
+                sni_val = params.get('sni') or params.get('servername')
+                if sni_val:
+                    self.data['sni'] = sni_val
+                    self.data['servername'] = sni_val
                 if 'security' in params:
                     if params['security'] in ('tls', 'reality'):
                         self.data['tls'] = True
@@ -295,7 +306,8 @@ class Node:
             }
             if parsed.query:
                 params = dict(parse_qsl(parsed.query))
-                if 'sni' in params: self.data['sni'] = params['sni']
+                sni_val = params.get('sni') or params.get('servername')
+                if sni_val: self.data['sni'] = sni_val
                 
                 # 只有当 obfs 存在且 obfs-password 不为空时才保留 obfs 混淆设置
                 # 避免产生有 obfs 但无 obfs-password 的缺陷节点导致 Clash 抛出 missing obfs password 错误
@@ -359,8 +371,9 @@ class Node:
             query = []
             if self.data.get('tls'):
                 query.append("security=" + ("reality" if self.data.get('reality-opts') else "tls"))
-            if self.data.get('servername'):
-                query.append("sni=" + quote(str(self.data.get('servername'))))
+            sni = self.data.get('sni') or self.data.get('servername')
+            if sni:
+                query.append("sni=" + quote(str(sni)))
             if self.data.get('network'):
                 query.append("type=" + str(self.data.get('network')))
             if self.data.get('flow'):
@@ -385,8 +398,9 @@ class Node:
         elif t == 'trojan':
             pwd = quote(str(self.data.get('password', '')))
             query = []
-            if self.data.get('sni'):
-                query.append("sni=" + quote(str(self.data.get('sni'))))
+            sni = self.data.get('sni') or self.data.get('servername')
+            if sni:
+                query.append("sni=" + quote(str(sni)))
             if self.data.get('network'):
                 query.append("type=" + str(self.data.get('network')))
             if self.data.get('skip-cert-verify'):
@@ -402,8 +416,9 @@ class Node:
         elif t in ('hysteria2', 'hy2'):
             pwd = quote(str(self.data.get('password', '')))
             query = []
-            if self.data.get('sni'):
-                query.append("sni=" + quote(str(self.data.get('sni'))))
+            sni = self.data.get('sni') or self.data.get('servername')
+            if sni:
+                query.append("sni=" + quote(str(sni)))
             if self.data.get('obfs'):
                 query.append("obfs=" + str(self.data.get('obfs')))
             if self.data.get('obfs-password'):

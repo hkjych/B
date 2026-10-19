@@ -119,9 +119,9 @@
 - **涉及文件**：`core/processor.py` L47-50, L138, `tests/test_processor.py`
 - **完成情况**：在 `INVALID_SERVERS` 黑名单中补齐了 `'[::1]'`, `'::'`, `'[::]'`，并在 `filter_invalid()` 中对服务器地址执行 `strip('[]')` 预处理，彻底过滤各种带括号/裸写的 IPv6 回环及未指定地址假节点，同时确保合法外网 IPv6 节点不受影响；在 `test_processor_filter_invalid_servers` 补充针对性单测全部通过。
 
-### 3.2 SNI 字段统一
-- **涉及文件**：`core/parser.py` 多处 `_load_*` 和 `to_url()`
-- **修改**：所有协议统一使用 `sni` 字段名；`to_url()` 统一检查 `self.data.get('sni') or self.data.get('servername')`
+### 3.2 SNI 字段统一 [✅ 已完成]
+- **涉及文件**：`core/parser.py` L88-93, L123, L235, L268-270, L303, L374, L400, L417, `tests/test_parser.py`
+- **完成情况**：在所有协议（VMess、VLESS、Trojan、Hysteria2）的 URL 解析和字典清洗时统一以 `sni` 为标准字段，并双向兼容 `servername`；在 `to_url()` 导出时统一通过 `self.data.get('sni') or self.data.get('servername')` 提取，确保无论源格式为何种命名均可完整导出 `sni=` 参数，消弭跨内核协议导出差异与去重指纹漂移；新增 `test_sni_and_servername_unification` 单元测试全部通过。
 
 ### 3.3 测速 0 速节点降分
 - **涉及文件**：`core/generator.py` L159-166
