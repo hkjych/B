@@ -135,9 +135,9 @@
 - **涉及文件**：`utils/stats.py` L18-22, `tests/test_stats.py`
 - **完成情况**：在 `build_overview_markdown` 中对时间戳执行规范化转义 `safe_timestamp = str(timestamp).replace('-', '--').replace(' ', '_').replace(':', '%3A')`，严格遵循 Shields.io 规范（短横杠转义为 `--`，空格转义为 `_`，冒号转义为 `%3A`），彻底解决了此前因日期未转义短横杠导致 Shields.io 徽章服务端解析崩溃返回 `404: badge not found` 的问题；新增 `test_build_overview_shields_badge_escaping` 单元测试全部通过。
 
-### 3.6 源名称 Markdown 转义
-- **涉及文件**：`utils/stats.py` L80-81
-- **修改**：`safe_name = str(name).replace('|', '-').replace('`', "'")`
+### 3.6 源名称 Markdown 转义 [✅ 已完成]
+- **涉及文件**：`utils/stats.py` L111-116, `tests/test_stats.py`
+- **完成情况**：在 `build_source_stats_markdown` 中对各订阅源名称执行 Markdown 表格语法安全清洗：将可能导致表格列分裂的管道符 `|` 替换为 `-`、破坏行内代码块的反引号 `` ` `` 替换为 `'`，并进一步过滤换行符 `\r\n`；新增 `test_build_source_stats_markdown_safe_escaping` 单元测试覆盖各类非法破坏字符均全部通过。
 
 ### 3.7 私有 IP 网段过滤（防 SSRF）
 - **涉及文件**：`core/processor.py` L46-49

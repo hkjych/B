@@ -111,7 +111,7 @@ def build_source_stats_markdown(source_results: List[Dict[str, Any]], now: Optio
     for idx, item in enumerate(sorted_results, 1):
         v_count = item.get('valid_count', 0)
         pct = (v_count / total_valid * 100) if total_valid > 0 else 0
-        safe_name = str(item.get('name', '未命名源')).replace('|', '-').replace('`', "'")
+        safe_name = str(item.get('name', '未命名源')).replace('\r', '').replace('\n', ' ').replace('|', '-').replace('`', "'")
         lines.append(f"| {idx} | `{safe_name}` | **{v_count}** 个 | `{pct:.2f}%` |")
 
     lines.extend([

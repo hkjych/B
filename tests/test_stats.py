@@ -101,6 +101,7 @@ class TestStats(unittest.TestCase):
         source_results = [
             {'name': 'Source | with | pipes', 'valid_count': 10},
             {'name': 'Source `with` backticks', 'valid_count': 5},
+            {'name': 'Source\nwith\r\nnewlines', 'valid_count': 3},
         ]
         table = build_source_stats_markdown(source_results)
         # Pipes inside name must be replaced by - so table doesn't split columns
@@ -109,6 +110,9 @@ class TestStats(unittest.TestCase):
         # Backticks inside code block must be replaced
         self.assertNotIn("`Source `with` backticks`", table)
         self.assertIn("`Source 'with' backticks`", table)
+        # Newlines inside name must be stripped/replaced
+        self.assertNotIn("\nwith\r\n", table)
+        self.assertIn("`Source with newlines`", table)
 
     def test_build_overview_shields_badge_escaping(self):
         badges, _ = build_overview_markdown(
