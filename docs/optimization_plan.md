@@ -107,9 +107,9 @@
 - **涉及文件**：`main.py` L31, L46-51, `tests/test_main.py`
 - **完成情况**：在 `main.py` 中引入 `(data.get('settings') or {})...` 链式短路安全取值与 `isinstance(lp_data, list)` 格式自适应兼容，彻底解决 YAML 配置留空（`None`）或列表格式引发的 `AttributeError` 崩溃；新增 `test_sources_yaml_empty_settings_defense` 与 `test_private_sources_formats_defense` 单元测试全部通过。
 
-### 2.8 Telegram 通知 HTML 转义
-- **涉及文件**：`utils/notify.py` L33-46
-- **修改**：引入 `import html`，所有插值变量包裹 `html.escape(...)`
+### 2.8 Telegram 通知 HTML 转义 [✅ 已完成]
+- **涉及文件**：`utils/notify.py` L1, L17, L25, `tests/test_notify.py`
+- **完成情况**：在 `utils/notify.py` 中引入 `import html`，对格式化模板中插入的时间戳、动态地区名称等插值变量严谨包裹 `html.escape(...)`，彻底杜绝特殊字符破坏 Telegram HTML 解析导致的 `HTTP 400 Bad Request` 发送失败异常；新增 `test_format_tg_summary_normal` 与 `test_format_tg_summary_html_escaping` 单元测试全部通过。
 
 ---
 

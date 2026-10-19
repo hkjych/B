@@ -1,3 +1,4 @@
+import html
 import sys
 import os
 import re
@@ -15,7 +16,7 @@ def format_tg_summary(gen_stats: Dict[str, Any]) -> str:
     """根据统计字典格式化 Telegram 消息看板文案"""
     region_nodes = gen_stats.get('region_nodes', {})
     others = gen_stats.get('others', [])
-    timestamp = gen_stats.get('timestamp', '')
+    timestamp = html.escape(str(gen_stats.get('timestamp', '')))
     source_count = gen_stats.get('source_count', 0)
     raw_count = gen_stats.get('raw_count', 0)
     total_nodes = gen_stats.get('total_nodes', 0)
@@ -24,7 +25,8 @@ def format_tg_summary(gen_stats: Dict[str, Any]) -> str:
     region_lines = []
     for key, nodes in region_nodes.items():
         name = REGION_NAMES.get(key, key)
-        region_lines.append(f"{name} {len(nodes)}")
+        safe_name = html.escape(str(name))
+        region_lines.append(f"{safe_name} {len(nodes)}")
     if others:
         region_lines.append(f"🌍 其他 {len(others)}")
 
