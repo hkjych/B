@@ -139,9 +139,9 @@
 - **涉及文件**：`utils/stats.py` L111-116, `tests/test_stats.py`
 - **完成情况**：在 `build_source_stats_markdown` 中对各订阅源名称执行 Markdown 表格语法安全清洗：将可能导致表格列分裂的管道符 `|` 替换为 `-`、破坏行内代码块的反引号 `` ` `` 替换为 `'`，并进一步过滤换行符 `\r\n`；新增 `test_build_source_stats_markdown_safe_escaping` 单元测试覆盖各类非法破坏字符均全部通过。
 
-### 3.7 私有 IP 网段过滤（防 SSRF）
-- **涉及文件**：`core/processor.py` L46-49
-- **修改**：引入 `ipaddress` 模块，补充 RFC 1918 私有网段 + 云元数据地址过滤
+### 3.7 私有 IP 网段过滤（防 SSRF） [✅ 已完成]
+- **涉及文件**：新增 `utils/validators.py`, `core/processor.py` L46-48, `tests/test_validators.py`, `tests/test_processor.py`
+- **完成情况**：新增 `utils/validators.py` 专用安全校验模块，引入 `ipaddress` 模块实现 `is_invalid_or_private_server`，系统拦截 RFC 1918 私有网段（`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`）、回环网段（`127.0.0.0/8`, `::1`）、链路本地/云元数据（`169.254.0.0/16`, `fe80::/10`）、运营商 CGNAT（`100.64.0.0/10`）、保留/多播与 IPv6 ULA 网段；成功杜绝了此前混入订阅中的 10 个恶意伪造 `127.0.0.53` 节点；`core/processor.py` 引入该模块保持向下兼容；新增 `test_validators.py` 与 `test_processor.py` 单测全部通过。
 
 ### 3.8 协议白名单统一定义
 - **涉及文件**：新增 `utils/constants.py`

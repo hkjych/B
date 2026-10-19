@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import unittest
 from core.parser import Node
-from core.processor import NodeProcessor
+from core.processor import NodeProcessor, is_invalid_or_private_server
 
 class TestProcessor(unittest.TestCase):
     def test_processor_filter_invalid_servers(self):
@@ -14,14 +14,60 @@ class TestProcessor(unittest.TestCase):
             Node({"name": "Node_Localhost", "type": "vmess", "server": "localhost", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
             Node({"name": "Node_IPv6_Loopback_Bracket", "type": "vmess", "server": "[::1]", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
             Node({"name": "Node_IPv6_Loopback_Plain", "type": "vmess", "server": "::1", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
-            Node({"name": "Node_IPv6_Zero_Bracket", "type": "vmess", "server": "[::]", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
+            Node({"name": "Node_Loopback_53", "type": "vmess", "server": "127.0.0.53", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
+            Node({"name": "Node_Private_10", "type": "vmess", "server": "10.0.0.1", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
+            Node({"name": "Node_Private_172", "type": "vmess", "server": "172.16.0.1", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
+            Node({"name": "Node_Private_192", "type": "vmess", "server": "192.168.1.1", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
+            Node({"name": "Node_Cloud_Metadata", "type": "vmess", "server": "169.254.169.254", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
+            Node({"name": "Node_CGNAT", "type": "vmess", "server": "100.64.0.1", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
+            Node({"name": "Node_IPv6_LinkLocal", "type": "vmess", "server": "[fe80::1]", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
+            Node({"name": "Node_IPv6_ULA", "type": "vmess", "server": "[fc00::1]", "port": 443, "uuid": "a0000000-0000-0000-0000-000000000000"}),
+            Node({"name": "Node_Valid_Domain", "type": "ss", "server": "my-proxy.fastnode.org", "port": 443, "cipher": "aes-128-gcm", "password": "pwd"}),
             Node({"name": "Node_NoUUID", "type": "vmess", "server": "1.2.3.4", "port": 443}),
             Node({"name": "Node_BadPort", "type": "vmess", "server": "1.2.3.4", "port": -1, "uuid": "a0000000-0000-0000-0000-000000000000"}),
         ]
         valid = processor.filter_invalid(nodes)
-        self.assertEqual(len(valid), 2)
+        self.assertEqual(len(valid), 3)
         valid_names = {n.name for n in valid}
-        self.assertEqual(valid_names, {"Node_Valid", "Node_Valid_IPv6"})
+        self.assertEqual(valid_names, {"Node_Valid", "Node_Valid_IPv6", "Node_Valid_Domain"})
+
+    def test_is_invalid_or_private_server(self):
+        # 无效与占位
+        self.assertTrue(is_invalid_or_private_server(""))
+        self.assertTrue(is_invalid_or_private_server("0.0.0.0"))
+        self.assertTrue(is_invalid_or_private_server("localhost"))
+        self.assertTrue(is_invalid_or_private_server("example.com"))
+        self.assertTrue(is_invalid_or_private_server("bad server space"))
+
+        # 回环 (127.0.0.0/8, ::1)
+        self.assertTrue(is_invalid_or_private_server("127.0.0.1"))
+        self.assertTrue(is_invalid_or_private_server("127.0.0.53"))
+        self.assertTrue(is_invalid_or_private_server("127.255.255.255"))
+        self.assertTrue(is_invalid_or_private_server("::1"))
+        self.assertTrue(is_invalid_or_private_server("[::1]"))
+
+        # RFC 1918 私有内网
+        self.assertTrue(is_invalid_or_private_server("10.0.0.1"))
+        self.assertTrue(is_invalid_or_private_server("172.16.0.1"))
+        self.assertTrue(is_invalid_or_private_server("172.31.255.254"))
+        self.assertTrue(is_invalid_or_private_server("192.168.1.1"))
+
+        # 云元数据 / 链路本地 (169.254.0.0/16, fe80::/10)
+        self.assertTrue(is_invalid_or_private_server("169.254.169.254"))
+        self.assertTrue(is_invalid_or_private_server("fe80::1"))
+        self.assertTrue(is_invalid_or_private_server("[fe80::1]"))
+
+        # CGNAT (100.64.0.0/10) 与 IPv6 ULA
+        self.assertTrue(is_invalid_or_private_server("100.64.0.1"))
+        self.assertTrue(is_invalid_or_private_server("fc00::1"))
+        self.assertTrue(is_invalid_or_private_server("[fc00::1]"))
+
+        # 合法公网 IP 与正常域名 (安全放行)
+        self.assertFalse(is_invalid_or_private_server("1.2.3.4"))
+        self.assertFalse(is_invalid_or_private_server("8.8.8.8"))
+        self.assertFalse(is_invalid_or_private_server("2606:4700:4700::1111"))
+        self.assertFalse(is_invalid_or_private_server("[2606:4700:4700::1111]"))
+        self.assertFalse(is_invalid_or_private_server("hk.node.example.org"))
 
     def test_processor_deduplicate(self):
         processor = NodeProcessor()
