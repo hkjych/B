@@ -127,9 +127,9 @@
 - **涉及文件**：`core/generator.py` L159-174, `tests/test_generator.py`
 - **完成情况**：在 `get_node_quality_score()` 中对测速结果进行有效性校验（`speed > 0`）；若测速值为 0.0 MB/s 或 0 KB/s（表明节点已超时断连挂掉），果断降权至 5.0 分垫底，彻底杜绝死节点拿 100 分高分并被排在精选池前面的问题；新增 `test_generator_zero_speed_nodes_demotion` 单元测试全部通过。
 
-### 3.4 `_yaml_v3_needs_quotes` 移除裸十六进制误判
-- **涉及文件**：`core/generator.py` L58-62
-- **修改**：删除 `int(plain, 16)` 分支，仅保留 `int(plain, 0)` 处理带 `0x` 前缀的十六进制
+### 3.4 `_yaml_v3_needs_quotes` 移除裸十六进制误判 [✅ 已完成]
+- **涉及文件**：`core/generator.py` L58-62, `tests/test_generator.py`
+- **完成情况**：移除 `_yaml_v3_needs_quotes` 中的 `int(plain, 16)` 误判分支，仅保留 `int(plain, 0)` 检测合法的前缀进制数（`0x`、`0o`、`0b`）；彻底杜绝了无前缀的裸十六进制字符串（如密码、MD5 哈希值、混淆密码等）被误加双引号的问题，保持 YAML 导出的简洁规范；新增 `test_yaml_v3_needs_quotes` 及针对 SafeDumper 导出的单元测试全部通过。
 
 ### 3.5 Shields.io 徽章日期转义
 - **涉及文件**：`utils/stats.py` L19-21

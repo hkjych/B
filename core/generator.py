@@ -55,11 +55,6 @@ def _yaml_v3_needs_quotes(s: str) -> bool:
         return True
     except ValueError:
         pass
-    try:
-        int(plain, 16)
-        return True
-    except ValueError:
-        pass
     if _YAML_V3_FLOAT.match(s) or _YAML_V3_TIMESTAMP.match(s):
         return True
     return False

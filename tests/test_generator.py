@@ -3,7 +3,7 @@ import yaml
 import tempfile
 import unittest
 from core.parser import Node
-from core.generator import Generator
+from core.generator import Generator, _yaml_v3_needs_quotes
 
 class TestGenerator(unittest.TestCase):
     def setUp(self):
@@ -167,7 +167,7 @@ class TestGenerator(unittest.TestCase):
             with open(template_path, "w", encoding="utf-8") as f:
                 yaml.safe_dump(self.template_data, f)
 
-            # 包含纯数字密码、布尔伪装字符串以及深层控制字符
+            # 包含纯数字密码、布尔伪装字符串、裸十六进制 hash 以及深层控制字符
             node = Node({
                 "name": "Special_Quote_Node",
                 "type": "ss",
@@ -175,10 +175,12 @@ class TestGenerator(unittest.TestCase):
                 "port": 443,
                 "cipher": "aes-128-gcm",
                 "password": "true",
+                "uuid": "123456",
                 "plugin": "obfs",
                 "plugin-opts": {
                     "mode": "tls",
-                    "host": "evil\x9f\x87host.com"
+                    "host": "evil\x9f\x87host.com",
+                    "obfs-password": "87d72c2949c0ca85bbda09459244e374"
                 }
             })
 
@@ -188,12 +190,40 @@ class TestGenerator(unittest.TestCase):
             with open(output_path, "r", encoding="utf-8") as f:
                 raw_yaml = f.read()
 
-            # 1. 验证 password: "true" 带有双引号，防止被 Go 解析为布尔值
+            # 1. 验证 password: "true", uuid: "123456" 带有双引号，防止被 Go 解析为布尔值或整数
             self.assertIn('password: "true"', raw_yaml)
-            # 2. 验证控制字符被完全清洗
+            self.assertIn('uuid: "123456"', raw_yaml)
+            # 2. 验证裸十六进制字符串 (如 MD5/hash) 不会加不必要的双引号
+            self.assertIn('obfs-password: 87d72c2949c0ca85bbda09459244e374', raw_yaml)
+            self.assertNotIn('obfs-password: "87d72c2949c0ca85bbda09459244e374"', raw_yaml)
+            # 3. 验证控制字符被完全清洗
             self.assertNotIn("\x9f", raw_yaml)
             self.assertNotIn("\x87", raw_yaml)
             self.assertIn("evilhost.com", raw_yaml)
+
+    def test_yaml_v3_needs_quotes(self):
+        # 需加引号的情况：布尔/特殊字面量
+        for lit in ["true", "True", "false", "False", "null", "NULL", "~"]:
+            self.assertTrue(_yaml_v3_needs_quotes(lit), f"{lit} should need quotes")
+        # 纯数字
+        self.assertTrue(_yaml_v3_needs_quotes("123456"))
+        self.assertTrue(_yaml_v3_needs_quotes("0123"))
+        # 显式带 0x/0o/0b 前缀的进制数字
+        self.assertTrue(_yaml_v3_needs_quotes("0x1a2b"))
+        self.assertTrue(_yaml_v3_needs_quotes("0o755"))
+        self.assertTrue(_yaml_v3_needs_quotes("0b1010"))
+        # 浮点数与时间戳
+        self.assertTrue(_yaml_v3_needs_quotes("3.14"))
+        self.assertTrue(_yaml_v3_needs_quotes("1e5"))
+        self.assertTrue(_yaml_v3_needs_quotes("2026-10-19"))
+
+        # 无需加引号的情况：裸十六进制字符串 (Reality short-id, MD5 hash, 随机密码等)
+        self.assertFalse(_yaml_v3_needs_quotes("aebdb601b1371778"))
+        self.assertFalse(_yaml_v3_needs_quotes("7eadc6dbe2ae"))
+        self.assertFalse(_yaml_v3_needs_quotes("87d72c2949c0ca85bbda09459244e374"))
+        # 普通字符串与空字符串
+        self.assertFalse(_yaml_v3_needs_quotes("hello_world"))
+        self.assertFalse(_yaml_v3_needs_quotes(""))
 
     def test_generator_max_pool_size_strict_cap_after_fallback(self):
         with tempfile.TemporaryDirectory() as tmpdir:
