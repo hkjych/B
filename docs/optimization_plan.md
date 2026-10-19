@@ -123,13 +123,9 @@
 - **涉及文件**：`core/parser.py` L88-93, L123, L235, L268-270, L303, L374, L400, L417, `tests/test_parser.py`
 - **完成情况**：在所有协议（VMess、VLESS、Trojan、Hysteria2）的 URL 解析和字典清洗时统一以 `sni` 为标准字段，并双向兼容 `servername`；在 `to_url()` 导出时统一通过 `self.data.get('sni') or self.data.get('servername')` 提取，确保无论源格式为何种命名均可完整导出 `sni=` 参数，消弭跨内核协议导出差异与去重指纹漂移；新增 `test_sni_and_servername_unification` 单元测试全部通过。
 
-### 3.3 测速 0 速节点降分
-- **涉及文件**：`core/generator.py` L159-166
-- **修改**：
-  ```python
-  speed = float(m_mb.group(1))
-  score = (100.0 + speed) if speed > 0 else 5.0  # 0速节点极低分
-  ```
+### 3.3 测速 0 速节点降分 [✅ 已完成]
+- **涉及文件**：`core/generator.py` L159-174, `tests/test_generator.py`
+- **完成情况**：在 `get_node_quality_score()` 中对测速结果进行有效性校验（`speed > 0`）；若测速值为 0.0 MB/s 或 0 KB/s（表明节点已超时断连挂掉），果断降权至 5.0 分垫底，彻底杜绝死节点拿 100 分高分并被排在精选池前面的问题；新增 `test_generator_zero_speed_nodes_demotion` 单元测试全部通过。
 
 ### 3.4 `_yaml_v3_needs_quotes` 移除裸十六进制误判
 - **涉及文件**：`core/generator.py` L58-62

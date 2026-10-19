@@ -270,6 +270,39 @@ class TestGenerator(unittest.TestCase):
             # 3. 验证私有中国节点仍完整保留在 👑 私有节点 策略组供专属需要时选择
             self.assertIn("👑 🇨🇳 私有上海直连", private_proxies)
 
+    def test_generator_zero_speed_nodes_demotion(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template_path = os.path.join(tmpdir, "config.yaml")
+            output_path = os.path.join(tmpdir, "output.yaml")
+            with open(template_path, "w", encoding="utf-8") as f:
+                yaml.safe_dump(self.template_data, f)
+
+            fast_node = Node({"name": "🇯🇵 日本高速|5.2MB/s", "type": "ss", "server": "1.1.1.1", "port": 443})
+            normal_vless = Node({"name": "🇯🇵 日本普通VLESS", "type": "vless", "server": "1.1.1.2", "port": 443})
+            normal_trojan = Node({"name": "🇯🇵 日本普通Trojan", "type": "trojan", "server": "1.1.1.3", "port": 443})
+            zero_mb_node = Node({"name": "🇯🇵 日本失效|0.0MB/s", "type": "ss", "server": "1.1.1.4", "port": 443})
+            zero_kb_node = Node({"name": "🇯🇵 日本失效|0KB/s", "type": "ss", "server": "1.1.1.5", "port": 443})
+
+            generator = Generator(template_path)
+            generator.generate([zero_mb_node, fast_node, normal_trojan, zero_kb_node, normal_vless], output_path)
+
+            with open(output_path, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f)
+
+            groups = {g["name"]: g for g in cfg["proxy-groups"]}
+            jp_group = groups.get("⚡ 自动选择 | 🇯🇵 日本")
+            self.assertIsNotNone(jp_group)
+            proxies = jp_group["proxies"]
+
+            # 1. 验证 5.2MB/s 获得最高分，排在第 1 位
+            self.assertEqual(proxies[0], "🇯🇵 日本高速|5.2MB/s")
+            # 2. 验证普通 VLESS (60分) 与 Trojan (50分) 位于中间梯队
+            self.assertEqual(proxies[1], "🇯🇵 日本普通VLESS")
+            self.assertEqual(proxies[2], "🇯🇵 日本普通Trojan")
+            # 3. 验证 0.0MB/s 与 0KB/s 被大幅降权至 5 分，被排在最末尾垫底
+            self.assertEqual(set(proxies[3:]), {"🇯🇵 日本失效|0.0MB/s", "🇯🇵 日本失效|0KB/s"})
+
 if __name__ == "__main__":
     unittest.main()
+
 

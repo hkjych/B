@@ -159,25 +159,32 @@ class Generator:
             m_mb = _MB_SPEED_RE.search(name)
             if m_mb:
                 try:
-                    score = 100.0 + float(m_mb.group(1))
+                    speed_mb = float(m_mb.group(1))
+                    score = (100.0 + speed_mb) if speed_mb > 0.0 else 5.0
                 except (ValueError, TypeError):
                     score = 100.0
-            elif _KB_SPEED_RE.search(name):
-                score = 95.0
-            elif 'speednode' in name_lower:
-                score = 90.0
-            elif node_type in ('hysteria2', 'hy2') or 'hy2' in name_lower or 'hysteria' in name_lower:
-                score = 80.0
-            elif node_obj and (node_obj.data.get('reality-opts') or 'reality' in name_lower):
-                score = 75.0
-            elif node_type == 'vless':
-                score = 60.0
-            elif node_type == 'trojan':
-                score = 50.0
-            elif node_type == 'ss':
-                score = 40.0
             else:
-                score = 30.0
+                m_kb = _KB_SPEED_RE.search(name)
+                if m_kb:
+                    try:
+                        speed_kb = float(m_kb.group(1))
+                        score = (90.0 + min(speed_kb / 1024.0, 5.0)) if speed_kb > 0.0 else 5.0
+                    except (ValueError, TypeError):
+                        score = 90.0
+                elif 'speednode' in name_lower:
+                    score = 90.0
+                elif node_type in ('hysteria2', 'hy2') or 'hy2' in name_lower or 'hysteria' in name_lower:
+                    score = 80.0
+                elif node_obj and (node_obj.data.get('reality-opts') or 'reality' in name_lower):
+                    score = 75.0
+                elif node_type == 'vless':
+                    score = 60.0
+                elif node_type == 'trojan':
+                    score = 50.0
+                elif node_type == 'ss':
+                    score = 40.0
+                else:
+                    score = 30.0
             return score
 
         # 4. Create Dynamic Region Groups (地区内自动选择同样采用 fallback 故障转移模式，并按质量排序)
