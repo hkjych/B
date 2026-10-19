@@ -103,13 +103,9 @@
 - **涉及文件**：`core/fetcher.py` L229-237, `tests/test_fetcher.py`
 - **完成情况**：在 Base64 解码后的逐行处理中严格执行 `ALLOWED_PROTOCOLS` 白名单前缀过滤，有效拦截订阅列表中掺杂的 Telegram 广告、公告说明与 HTTP 非代理杂质文本，杜绝畸形 Node 对象实例化及潜在解析异常；新增 `test_parse_content_base64_protocol_filter_ignores_ads_and_text` 单元测试全部通过。
 
-### 2.7 `main.py` 空配置防御
-- **涉及文件**：`main.py` L31, L46-51
-- **修改**：
-  ```python
-  smart_pool_settings = (data.get('settings') or {}).get('smart_pool', {}) or {}
-  lp_sources = lp_data if isinstance(lp_data, list) else (lp_data.get('sources') or [])
-  ```
+### 2.7 `main.py` 空配置防御 [✅ 已完成]
+- **涉及文件**：`main.py` L31, L46-51, `tests/test_main.py`
+- **完成情况**：在 `main.py` 中引入 `(data.get('settings') or {})...` 链式短路安全取值与 `isinstance(lp_data, list)` 格式自适应兼容，彻底解决 YAML 配置留空（`None`）或列表格式引发的 `AttributeError` 崩溃；新增 `test_sources_yaml_empty_settings_defense` 与 `test_private_sources_formats_defense` 单元测试全部通过。
 
 ### 2.8 Telegram 通知 HTML 转义
 - **涉及文件**：`utils/notify.py` L33-46
