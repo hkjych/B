@@ -46,6 +46,7 @@ class TestStats(unittest.TestCase):
         self.assertNotIn("old_sources", updated)
 
         self.assertIn("Valid_Nodes-100", updated)
+        self.assertIn("Updated-2026--10--08_12%3A00%3A00-green.svg", updated)
         self.assertIn("香港", updated)
         self.assertIn("美国", updated)
         self.assertIn("Source A", updated)
@@ -108,6 +109,22 @@ class TestStats(unittest.TestCase):
         # Backticks inside code block must be replaced
         self.assertNotIn("`Source `with` backticks`", table)
         self.assertIn("`Source 'with' backticks`", table)
+
+    def test_build_overview_shields_badge_escaping(self):
+        badges, _ = build_overview_markdown(
+            total_nodes=500,
+            region_nodes={'HK': ['n1']},
+            others=[],
+            timestamp='2026-10-19 15:30:45',
+            source_count=8,
+            raw_count=1000,
+            elapsed_time=2.5,
+        )
+        # 验证连字符 - 转义为 --，空格转义为 _，冒号转义为 %3A
+        self.assertIn("Updated-2026--10--19_15%3A30%3A45-green.svg", badges)
+        self.assertNotIn("2026-10-19", badges)
+        self.assertIn("Valid_Nodes-500-orange.svg", badges)
+        self.assertIn("Active_Sources-8-blue.svg", badges)
 
 
 if __name__ == "__main__":

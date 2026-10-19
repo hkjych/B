@@ -15,8 +15,9 @@ def build_overview_markdown(
     elapsed_time: float,
 ) -> Tuple[str, str]:
     """生成状态徽章 Markdown 与地区分布统计表格 Markdown"""
+    safe_timestamp = str(timestamp).replace('-', '--').replace(' ', '_').replace(':', '%3A')
     badge_content = (
-        f"![Update](https://img.shields.io/badge/Updated-{timestamp.replace(' ', '--').replace(':', '%3A')}-green.svg?style=flat-square)\n"
+        f"![Update](https://img.shields.io/badge/Updated-{safe_timestamp}-green.svg?style=flat-square)\n"
         f"![Nodes](https://img.shields.io/badge/Valid_Nodes-{total_nodes}-orange.svg?style=flat-square)\n"
         f"![Sources](https://img.shields.io/badge/Active_Sources-{source_count}-blue.svg?style=flat-square)"
     )

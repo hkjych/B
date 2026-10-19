@@ -131,9 +131,9 @@
 - **涉及文件**：`core/generator.py` L58-62, `tests/test_generator.py`
 - **完成情况**：移除 `_yaml_v3_needs_quotes` 中的 `int(plain, 16)` 误判分支，仅保留 `int(plain, 0)` 检测合法的前缀进制数（`0x`、`0o`、`0b`）；彻底杜绝了无前缀的裸十六进制字符串（如密码、MD5 哈希值、混淆密码等）被误加双引号的问题，保持 YAML 导出的简洁规范；新增 `test_yaml_v3_needs_quotes` 及针对 SafeDumper 导出的单元测试全部通过。
 
-### 3.5 Shields.io 徽章日期转义
-- **涉及文件**：`utils/stats.py` L19-21
-- **修改**：`.replace('-', '--').replace(' ', '--').replace(':', '%3A')`
+### 3.5 Shields.io 徽章日期转义 [✅ 已完成]
+- **涉及文件**：`utils/stats.py` L18-22, `tests/test_stats.py`
+- **完成情况**：在 `build_overview_markdown` 中对时间戳执行规范化转义 `safe_timestamp = str(timestamp).replace('-', '--').replace(' ', '_').replace(':', '%3A')`，严格遵循 Shields.io 规范（短横杠转义为 `--`，空格转义为 `_`，冒号转义为 `%3A`），彻底解决了此前因日期未转义短横杠导致 Shields.io 徽章服务端解析崩溃返回 `404: badge not found` 的问题；新增 `test_build_overview_shields_badge_escaping` 单元测试全部通过。
 
 ### 3.6 源名称 Markdown 转义
 - **涉及文件**：`utils/stats.py` L80-81
