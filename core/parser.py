@@ -2,6 +2,7 @@ import json
 from typing import Dict, Any, Union, Optional
 from urllib.parse import urlparse, unquote, quote, parse_qsl
 from utils.common import b64decodes, b64decodes_safe, b64encodes
+from utils.constants import CANONICAL_PROTOCOLS, ALLOWED_TYPES
 
 class Node:
     def __init__(self, data: Union[Dict[str, Any], str]):
@@ -41,8 +42,7 @@ class Node:
         if protocol == 'hy2': protocol = 'hysteria2'
         
         # 严格过滤非法协议（如 HTML 标签内嵌的 https 链接）
-        allowed = ('vmess', 'vless', 'ss', 'trojan', 'hysteria2')
-        if protocol not in allowed:
+        if protocol not in CANONICAL_PROTOCOLS:
             return
 
         self.type = protocol

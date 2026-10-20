@@ -13,7 +13,7 @@ from utils.logger import logger
 GITHUB_RAW_PATTERN = re.compile(r'https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/([^/]+)/(.*)')
 URL_EXTRACT_PATTERN = re.compile(r'https?://[^\s)\]]+')
 YAML_FALLBACK_PATTERN = re.compile(r'-\s*(\{.*?name:.*?\})', re.DOTALL)
-ALLOWED_PROTOCOLS = ('vmess://', 'vless://', 'ss://', 'trojan://', 'hy2://', 'hysteria2://')
+from utils.constants import ALLOWED_PROTOCOLS
 
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",

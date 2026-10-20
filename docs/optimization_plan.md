@@ -143,9 +143,9 @@
 - **涉及文件**：新增 `utils/validators.py`, `core/processor.py` L46-48, `tests/test_validators.py`, `tests/test_processor.py`
 - **完成情况**：新增 `utils/validators.py` 专用安全校验模块，引入 `ipaddress` 模块实现 `is_invalid_or_private_server`，系统拦截 RFC 1918 私有网段（`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`）、回环网段（`127.0.0.0/8`, `::1`）、链路本地/云元数据（`169.254.0.0/16`, `fe80::/10`）、运营商 CGNAT（`100.64.0.0/10`）、保留/多播与 IPv6 ULA 网段；成功杜绝了此前混入订阅中的 10 个恶意伪造 `127.0.0.53` 节点；`core/processor.py` 引入该模块保持向下兼容；新增 `test_validators.py` 与 `test_processor.py` 单测全部通过。
 
-### 3.8 协议白名单统一定义
-- **涉及文件**：新增 `utils/constants.py`
-- **修改**：将 `ALLOWED_PROTOCOLS`、`ALLOWED_TYPES` 提取到统一常量模块，各文件引用
+### 3.8 协议白名单统一定义 [✅ 已完成]
+- **涉及文件**：新增 `utils/constants.py`, `core/fetcher.py` L16, `core/processor.py` L47, L115, `core/parser.py` L5, L44, `tests/test_constants.py`
+- **完成情况**：新增 `utils/constants.py` 统一定义 `ALLOWED_PROTOCOLS`、`ALLOWED_TYPES` 与 `CANONICAL_PROTOCOLS`；消除了此前分散在 `fetcher.py`、`processor.py` 和 `parser.py` 各自独立维护的硬编码白名单集合，修复了 `parser.py` 中遗漏 `hy2` 别名协议的隐患，并避免了 `filter_invalid()` 每次循环调用中重新分配集合的开销；新增 `test_constants.py` 单元测试全部通过。
 
 ### 3.9 YAML 输出改为 `allow_unicode=True`
 - **涉及文件**：`core/generator.py` L411

@@ -45,6 +45,7 @@ GROUP_NAMES.update({'🚀 选择代理', '🗺️ 选择地区', '♻️ 自动�
 
 # 引入通用网络地址与安全校验工具（防 SSRF，保留当前模块导出以保持兼容）
 from utils.validators import is_invalid_or_private_server, INVALID_SERVERS
+from utils.constants import ALLOWED_TYPES
 
 class NodeProcessor:
     def __init__(self):
@@ -112,7 +113,6 @@ class NodeProcessor:
         return nodes
 
     def filter_invalid(self, nodes: List[Node]) -> List[Node]:
-        ALLOWED_TYPES = {'vmess', 'vless', 'ss', 'trojan', 'hysteria2', 'hy2'}
         valid_nodes = []
         for node in nodes:
             try:
