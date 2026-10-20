@@ -8,7 +8,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Telegram Channel](https://img.shields.io/badge/Telegram-频道交流-26A5E4?style=flat-square&logo=telegram&logoColor=white)](https://t.me/MetaFetchNodes)
 <!-- STATS_BADGE_START -->
-![Update](https://img.shields.io/badge/Updated-2026--10--20_10%3A00%3A54-green.svg?style=flat-square)
+![Update](https://img.shields.io/badge/Updated-2026--10--20_10%3A37%3A38-green.svg?style=flat-square)
 ![Nodes](https://img.shields.io/badge/Valid_Nodes-778-orange.svg?style=flat-square)
 ![Sources](https://img.shields.io/badge/Active_Sources-10-blue.svg?style=flat-square)
 <!-- STATS_BADGE_END -->
@@ -104,14 +104,14 @@
 ## 📊 节点分布统计
 
 <!-- STATS_TABLE_START -->
-> 更新时间：`2026-10-20 10:00:54`
-> 运行分析：从 `10` 个活跃源中抓取 `1225` 个节点，耗时 `0.61s`。去重后保留 `778` 个有效节点。
+> 更新时间：`2026-10-20 10:37:38`
+> 运行分析：从 `10` 个活跃源中抓取 `1225` 个节点，耗时 `0.39s`。去重后保留 `778` 个有效节点。
 
 <div style="overflow-x: auto;">
 
 | 地区分布 | 🇭🇰香港 | 🇹🇼台湾 | 🇯🇵日本 | 🇺🇸美国 | 🇸🇬新加坡 | 🇰🇷韩国 | 🇩🇪德国 | 🇬🇧英国 | 🇫🇷法国 | 🇷🇺俄罗斯 | 🇨🇦加拿大 | 🇳🇱荷兰 | 🇨🇭瑞士 | 🇮🇳印度 | 🇹🇷土耳其 | 🇦🇺澳大利亚 | 🇲🇾马来西亚 | 🇮🇩印尼 | 🇧🇷巴西 | 🇦🇷阿根廷 | 🇲🇽墨西哥 | 🇪🇸西班牙 | 🇨🇳中国 | 🇷🇴罗马尼亚 | 🇫🇮芬兰 | 🇮🇪爱尔兰 | 🇸🇪瑞典 | 🇵🇱波兰 | 🇦🇹奥地利 | 🇦🇪阿联酋 | 🇰🇿哈萨克斯坦 | 🇨🇾塞浦路斯 | 🇺🇦乌克兰 | 🇳🇴挪威 | 🇩🇰丹麦 | 🇧🇬保加利亚 | 🇿🇦南非 | 🌍其他 | **总计** |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **数量** | 52 | 16 | 45 | 248 | 44 | 30 | 26 | 17 | 12 | 9 | 12 | 12 | 2 | 4 | 7 | 2 | 1 | 1 | 3 | 1 | 1 | 8 | 5 | 4 | 3 | 3 | 3 | 1 | 4 | 2 | 1 | 1 | 2 | 2 | 1 | 1 | 4 | 188 | **778** |
+| **数量** | 52 | 16 | 43 | 254 | 44 | 29 | 26 | 17 | 12 | 9 | 13 | 11 | 2 | 4 | 7 | 2 | 1 | 1 | 2 | 1 | 1 | 8 | 5 | 4 | 3 | 2 | 3 | 2 | 4 | 2 | 1 | 1 | 2 | 2 | 1 | 1 | 3 | 187 | **778** |
 
 </div>
 <!-- STATS_TABLE_END -->
@@ -121,7 +121,7 @@
 <!-- SOURCE_STATS_TABLE_START -->
 ### 📡 各订阅源贡献度明细
 
-> 数据计算时间：`2026-10-20 10:00:54`
+> 数据计算时间：`2026-10-20 10:37:37`
 
 <table width="100%"><tr><td>
 
