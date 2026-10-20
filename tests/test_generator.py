@@ -200,6 +200,10 @@ class TestGenerator(unittest.TestCase):
             self.assertNotIn("\x9f", raw_yaml)
             self.assertNotIn("\x87", raw_yaml)
             self.assertIn("evilhost.com", raw_yaml)
+            # 4. 验证 allow_unicode=True 使中文与 Emoji 直接可读输出，不出现 \u 或 \U 转义序列
+            self.assertIn("🚀 选择代理", raw_yaml)
+            self.assertIn("♻️ 自动选择", raw_yaml)
+            self.assertNotIn(r"\u9009\u62E9", raw_yaml)
 
     def test_yaml_v3_needs_quotes(self):
         # 需加引号的情况：布尔/特殊字面量

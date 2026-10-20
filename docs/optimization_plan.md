@@ -147,9 +147,9 @@
 - **涉及文件**：新增 `utils/constants.py`, `core/fetcher.py` L16, `core/processor.py` L47, L115, `core/parser.py` L5, L44, `tests/test_constants.py`
 - **完成情况**：新增 `utils/constants.py` 统一定义 `ALLOWED_PROTOCOLS`、`ALLOWED_TYPES` 与 `CANONICAL_PROTOCOLS`；消除了此前分散在 `fetcher.py`、`processor.py` 和 `parser.py` 各自独立维护的硬编码白名单集合，修复了 `parser.py` 中遗漏 `hy2` 别名协议的隐患，并避免了 `filter_invalid()` 每次循环调用中重新分配集合的开销；新增 `test_constants.py` 单元测试全部通过。
 
-### 3.9 YAML 输出改为 `allow_unicode=True`
-- **涉及文件**：`core/generator.py` L411
-- **修改**：`yaml.dump(..., allow_unicode=True)`，中文和 Emoji 直接可读
+### 3.9 YAML 输出改为 `allow_unicode=True` [✅ 已完成]
+- **涉及文件**：`core/generator.py` L414, `tests/test_generator.py`
+- **完成情况**：将 `yaml.dump(..., allow_unicode=True)` 启用 Unicode 直出，彻底消除了导出的 `list.meta.yml` 中中文节点名、策略组名称和国旗 Emoji 被强行转义为 `\uXXXX` / `\U0000XXXX` 的问题，生成文件对人类阅读完全友好且降低了文件传输体积；配合已有的 `SafeDumper` 依然严密保护易混淆数字与布尔值；新增针对 Unicode 原生可读导出的单元测试全部通过。
 
 ---
 
