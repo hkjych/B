@@ -14,6 +14,8 @@ class TestCommon(unittest.TestCase):
 
     def test_b64decodes_empty_or_invalid(self):
         self.assertEqual(b64decodes(""), "")
+        self.assertEqual(b64decodes(None), "")
+        self.assertEqual(b64decodes_safe(None), "")
         self.assertEqual(b64decodes("!!!invalid_base64!!!"), "")
 
     def test_b64decodes_with_whitespace(self):

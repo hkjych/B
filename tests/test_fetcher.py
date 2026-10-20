@@ -1,5 +1,6 @@
 import unittest
-from core.fetcher import Fetcher
+from core.fetcher import Fetcher, parallel_fetch
+from core.parser import Node
 
 class TestFetcher(unittest.TestCase):
     def setUp(self):
@@ -108,6 +109,62 @@ hysteria2://pwd@5.6.7.8:443#Hy2Node
         nodes = f.parse_content(content)
         self.assertEqual(len(nodes), 1)
         self.assertEqual(nodes[0].name, "URL11")
+
+    def test_fetcher_mirror_fallback(self):
+        import asyncio
+        from unittest.mock import AsyncMock, MagicMock
+
+        async def run_test():
+            mock_client = MagicMock()
+            attempts = []
+            async def mock_get(url, **kwargs):
+                attempts.append(str(url))
+                resp = MagicMock()
+                if "raw.githubusercontent.com" in str(url):
+                    resp.status_code = 500
+                    resp.content = b"Internal Server Error"
+                else:
+                    resp.status_code = 200
+                    resp.content = b"vmess://eyJhZGQiOiIxLjEuMS4xIiwicG9ydCI6NDQzLCJpZCI6ImEwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMCIsInBzIjoiTWlycm9yTm9kZSJ9"
+                return resp
+
+            mock_client.get = AsyncMock(side_effect=mock_get)
+            async with Fetcher(client=mock_client) as f:
+                nodes = await f.fetch_nodes("https://raw.githubusercontent.com/user/repo/master/sub.txt")
+                self.assertEqual(len(nodes), 1)
+                self.assertEqual(nodes[0].name, "MirrorNode")
+                self.assertGreaterEqual(len(attempts), 2)
+
+        asyncio.run(run_test())
+
+    def test_parallel_fetch(self):
+        import asyncio
+        from unittest.mock import patch
+
+        async def run_test():
+            source_infos = [
+                {'name': 'Public Source 1', 'url': 'https://example.com/s1', 'filters': {}, 'is_private': False},
+                {'name': 'Private Source 2', 'url': 'https://example.com/s2', 'filters': {}, 'is_private': True},
+            ]
+            async def fake_fetch(url, *args, **kwargs):
+                is_priv = kwargs.get('is_private', False)
+                if 's1' in url:
+                    n = Node({"name": "Pub1", "type": "ss", "server": "1.1.1.1", "port": 443, "cipher": "aes-128-gcm", "password": "p"})
+                    return [n]
+                else:
+                    n = Node({"name": "Priv1", "type": "ss", "server": "2.2.2.2", "port": 443, "cipher": "aes-128-gcm", "password": "p"})
+                    if is_priv:
+                        n.data['_is_private'] = True
+                    return [n]
+
+            with patch.object(Fetcher, 'fetch_nodes', side_effect=fake_fetch):
+                all_nodes, source_results = await parallel_fetch(source_infos)
+                self.assertEqual(len(all_nodes), 2)
+                self.assertEqual(len(source_results), 2)
+                self.assertFalse(source_results[0]['is_private'])
+                self.assertTrue(source_results[1]['is_private'])
+
+        asyncio.run(run_test())
 
 if __name__ == "__main__":
     unittest.main()

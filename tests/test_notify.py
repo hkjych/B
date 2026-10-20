@@ -1,5 +1,6 @@
 import unittest
-from utils.notify import format_tg_summary
+from unittest.mock import patch, MagicMock
+from utils.notify import format_tg_summary, send_tg_notification
 
 class TestNotify(unittest.TestCase):
     def test_format_tg_summary_normal(self):
@@ -54,6 +55,28 @@ class TestNotify(unittest.TestCase):
             self.assertIn('</code>', text)
         finally:
             REGION_NAMES.pop('CUSTOM', None)
+
+    @patch.dict('os.environ', {}, clear=True)
+    def test_send_tg_notification_missing_env(self):
+        # 缺少 TG_BOT_TOKEN 或 TG_CHAT_ID 时静默返回 False，不抛出任何异常
+        self.assertFalse(send_tg_notification("test"))
+
+    @patch.dict('os.environ', {'TG_BOT_TOKEN': '  bot123456:ABC-DEF  \n', 'TG_CHAT_ID': '  -10012345678  '}, clear=True)
+    @patch('urllib.request.urlopen')
+    def test_send_tg_notification_token_cleanup_and_mock_send(self, mock_urlopen):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b'{"ok": true, "result": {"message_id": 999}}'
+        mock_urlopen.return_value.__enter__.return_value = mock_resp
+
+        res = send_tg_notification("Hello MetaFetch Notification")
+        self.assertTrue(res)
+
+        # 验证 urlopen 请求的 URL 正确剥离了多余空白与 'bot' 前缀
+        req = mock_urlopen.call_args[0][0]
+        self.assertIn("api.telegram.org/bot123456:ABC-DEF/", req.full_url)
+        self.assertTrue("sendMessage" in req.full_url or "editMessageText" in req.full_url)
+        payload = req.data.decode('utf-8')
+        self.assertIn('"chat_id": "-10012345678"', payload)
 
 if __name__ == '__main__':
     unittest.main()

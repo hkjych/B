@@ -51,5 +51,23 @@ class TestRegions(unittest.TestCase):
         self.assertEqual(match_region("首尔 01"), "KR")
         self.assertEqual(match_region("法兰克福 01"), "DE")
 
+    def test_additional_regions_and_boundary_safety(self):
+        # 1. 扩充常用地区匹配 (TW, SG, GB, CA, CH)
+        self.assertEqual(match_region("Taiwan Taipei 01"), "TW")
+        self.assertEqual(match_region("Singapore 01 狮城"), "SG")
+        self.assertEqual(match_region("London UK 01"), "GB")
+        self.assertEqual(match_region("Toronto Canada 01"), "CA")
+        self.assertEqual(match_region("Zurich Switzerland 01"), "CH")
+
+        # 2. 国旗 Emoji 匹配
+        self.assertEqual(match_region("🇸🇬 SG 01"), "SG")
+        self.assertEqual(match_region("🇩🇪 DE 01"), "DE")
+        self.assertEqual(match_region("🇬🇧 GB 01"), "GB")
+        self.assertEqual(match_region("🇨🇦 CA 01"), "CA")
+
+        # 3. 2 字母单词边界防误判 (避免把单词内部子串识别为国家二字码)
+        self.assertIsNone(match_region("MAIN CHAIN NODE"))
+        self.assertIsNone(match_region("STATION ESCAPE"))
+
 if __name__ == '__main__':
     unittest.main()

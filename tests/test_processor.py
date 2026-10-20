@@ -227,5 +227,41 @@ class TestProcessor(unittest.TestCase):
         self.assertIn('_region', node_unmatched.data)
         self.assertIsNone(node_unmatched.data['_region'])
 
+    def test_port_boundaries_in_filter_invalid(self):
+        processor = NodeProcessor()
+        # 1. 有效端口：1, 65535, 字符串 "443"
+        valid_nodes = [
+            Node({"name": "P1", "type": "ss", "server": "8.8.4.4", "port": 1, "cipher": "aes-128-gcm", "password": "p"}),
+            Node({"name": "P65535", "type": "ss", "server": "8.8.4.4", "port": 65535, "cipher": "aes-128-gcm", "password": "p"}),
+            Node({"name": "PStr", "type": "ss", "server": "8.8.4.4", "port": "443", "cipher": "aes-128-gcm", "password": "p"}),
+        ]
+        res_valid = processor.filter_invalid(valid_nodes)
+        self.assertEqual(len(res_valid), 3)
+        self.assertEqual(res_valid[2].data['port'], 443)  # 转为整型
+
+        # 2. 非法边界端口：0, 65536, -1, None, 异常字符串
+        invalid_nodes = [
+            Node({"name": "P0", "type": "ss", "server": "8.8.4.4", "port": 0, "cipher": "aes-128-gcm", "password": "p"}),
+            Node({"name": "P65536", "type": "ss", "server": "8.8.4.4", "port": 65536, "cipher": "aes-128-gcm", "password": "p"}),
+            Node({"name": "PNeg", "type": "ss", "server": "8.8.4.4", "port": -1, "cipher": "aes-128-gcm", "password": "p"}),
+            Node({"name": "PNone", "type": "ss", "server": "8.8.4.4", "port": None, "cipher": "aes-128-gcm", "password": "p"}),
+            Node({"name": "PBadStr", "type": "ss", "server": "8.8.4.4", "port": "not_a_port", "cipher": "aes-128-gcm", "password": "p"}),
+        ]
+        res_invalid = processor.filter_invalid(invalid_nodes)
+        self.assertEqual(len(res_invalid), 0)
+
+    def test_ipv6_loopback_in_filter_invalid(self):
+        processor = NodeProcessor()
+        # 拦截各类 IPv6 回环与未指定地址
+        loopback_nodes = [
+            Node({"name": "IPv6 Loopback 1", "type": "ss", "server": "::1", "port": 8388, "cipher": "aes-128-gcm", "password": "p"}),
+            Node({"name": "IPv6 Loopback 2", "type": "ss", "server": "[::1]", "port": 8388, "cipher": "aes-128-gcm", "password": "p"}),
+            Node({"name": "IPv6 Unspecified 1", "type": "ss", "server": "::", "port": 8388, "cipher": "aes-128-gcm", "password": "p"}),
+            Node({"name": "IPv6 Unspecified 2", "type": "ss", "server": "[::]", "port": 8388, "cipher": "aes-128-gcm", "password": "p"}),
+            Node({"name": "IPv4 Loopback DNS", "type": "ss", "server": "127.0.0.53", "port": 8388, "cipher": "aes-128-gcm", "password": "p"}),
+        ]
+        filtered = processor.filter_invalid(loopback_nodes)
+        self.assertEqual(len(filtered), 0)
+
 if __name__ == "__main__":
     unittest.main()

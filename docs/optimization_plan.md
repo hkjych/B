@@ -177,16 +177,17 @@
   6. **移除多余的地区键排序**：删除 `core/generator.py` 中 `active_keys.sort()`，原生复用 Python 3.7+ 字典按 `REGIONS_DB` 既定插入顺序保留的稳定优先级；
   7. 补充对应各项单元测试（测试总数提升至 74 项），全量测试全部通过。
 
-### 4.3 补充单元测试
-| 新增测试文件 | 覆盖内容 |
-|---|---|
-| `tests/test_regions.py` | 子串碰撞、2 字母歧义、Emoji 匹配 |
-| `tests/test_main.py` | YAML 加载、环境变量私有源、空配置防御 |
-| `tests/test_notify.py` | HTML 转义、消息格式、异常处理 |
-| 补充 `test_common.py` | URL-Safe Base64、None 输入 |
-| 补充 `test_fetcher.py` | `parallel_fetch`、递归抓取、镜像降级 |
-| 补充 `test_generator.py` | `is_china_node` 前缀豁免、0 速评分、空节点 |
-| 补充 `test_processor.py` | `plugin-opts: None`、IPv6 回环、端口边界 |
+### 4.3 补充单元测试 [✅ 已完成]
+- **涉及文件**：`tests/test_regions.py`, `tests/test_main.py`, `tests/test_notify.py`, `tests/test_common.py`, `tests/test_fetcher.py`, `tests/test_generator.py`, `tests/test_processor.py`
+- **完成情况**：
+  1. **`test_regions.py` 地区与歧义测试**：补充常用地区（TW, SG, GB, CA, CH）、国旗 Emoji 匹配及 2 字母单词边界防误判测试（如 `MAIN CHAIN`、`STATION` 不被误判）；
+  2. **`test_main.py` 空配置与私有源格式**：测试 `settings: null` / `smart_pool: null` 防御，以及 List、Dict、空数据及非法字符串输入的自动解析与 `is_private=True` 规范化打标；
+  3. **`test_notify.py` 消息与异常处理**：测试 HTML 标签转义、Telegram 环境变量缺失时的静默防御、Token 异常空白与 `bot` 前缀自动清除及网络接口调用模拟；
+  4. **`test_common.py` Base64 与 None 输入**：补充 `b64decodes(None)` 与 `b64decodes_safe(None)` 防御测试；
+  5. **`test_fetcher.py` 镜像降级与并发抓取**：测试首选 GitHub Raw 失败时自动降级到镜像站获取节点，以及 `parallel_fetch` 并行抓取时的私有源属性透传；
+  6. **`test_generator.py` 中转白名单与空节点保底**：测试 CN2-GIA / IPLC 等中转海外节点白名单豁免逻辑，以及空节点列表场景下的策略组 `['DIRECT']` 保底回退；
+  7. **`test_processor.py` 端口边界与回环过滤**：测试端口范围（1-65535、非整型过滤、字符串强转）与 IPv6 回环（`::1`, `[::1]`, `::`, `[::]`, `127.0.0.53`）精准过滤；
+  8. 全工程测试用例总数达到 **83 项**，全量执行耗时仅 0.28s，全部通过。
 
 ### 4.4 配置与 CI 优化
 | 改动项 | 修改方案 |

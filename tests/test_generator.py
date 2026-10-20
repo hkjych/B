@@ -336,6 +336,52 @@ class TestGenerator(unittest.TestCase):
             # 3. 验证 0.0MB/s 与 0KB/s 被大幅降权至 5 分，被排在最末尾垫底
             self.assertEqual(set(proxies[3:]), {"🇯🇵 日本失效|0.0MB/s", "🇯🇵 日本失效|0KB/s"})
 
+    def test_is_china_node_whitelist_exemptions(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template_path = os.path.join(tmpdir, "config.yaml")
+            output_path = os.path.join(tmpdir, "output.yaml")
+            with open(template_path, "w", encoding="utf-8") as f:
+                yaml.safe_dump(self.template_data, f)
+
+            # 1. 纯境内节点 (应被排除出 自动选择)
+            node_pure_cn = Node({"name": "🇨🇳 中国电信上海节点", "type": "ss", "server": "1.1.1.1", "port": 443})
+            # 2. 带有 CN2-GIA / IPLC 等中转但明确标识海外落地 (白名单豁免，应进入 自动选择)
+            node_cn2_hk = Node({"name": "🇨🇳 CN2-GIA 🇭🇰 香港 01", "type": "ss", "server": "1.1.1.2", "port": 443})
+            node_iplc_jp = Node({"name": "🇨🇳 IPLC 🇯🇵 日本 01", "type": "ss", "server": "1.1.1.3", "port": 443})
+
+            generator = Generator(template_path)
+            generator.generate([node_pure_cn, node_cn2_hk, node_iplc_jp], output_path)
+
+            with open(output_path, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f)
+
+            groups = {g["name"]: g for g in cfg["proxy-groups"]}
+            auto_proxies = groups["♻️ 自动选择"]["proxies"]
+            self.assertIn("🇨🇳 CN2-GIA 🇭🇰 香港 01", auto_proxies)
+            self.assertIn("🇨🇳 IPLC 🇯🇵 日本 01", auto_proxies)
+            self.assertNotIn("🇨🇳 中国电信上海节点", auto_proxies)
+
+    def test_generator_empty_nodes_direct_fallback(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template_path = os.path.join(tmpdir, "config.yaml")
+            output_path = os.path.join(tmpdir, "output.yaml")
+            with open(template_path, "w", encoding="utf-8") as f:
+                yaml.safe_dump(self.template_data, f)
+
+            generator = Generator(template_path)
+            # 空节点列表生成防崩溃测试
+            stats = generator.generate([], output_path)
+            self.assertEqual(stats['total_nodes'], 0)
+
+            with open(output_path, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f)
+
+            groups = {g["name"]: g for g in cfg["proxy-groups"]}
+            self.assertEqual(groups["♻️ 自动选择"]["proxies"], ['DIRECT'])
+            self.assertEqual(groups["🔰 延迟最低"]["proxies"], ['DIRECT'])
+            self.assertEqual(groups["🗺️ 选择地区"]["proxies"], ['DIRECT'])
+            self.assertEqual(groups["✅ 手动选择"]["proxies"], ['DIRECT'])
+
 if __name__ == "__main__":
     unittest.main()
 
