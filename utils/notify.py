@@ -71,15 +71,8 @@ def send_tg_notification(summary_or_text: Union[Dict[str, Any], str] = None) -> 
         text = summary_or_text
 
     if not text:
-        if os.path.exists("tg_summary.txt"):
-            try:
-                with open("tg_summary.txt", "r", encoding="utf-8") as f:
-                    text = f.read()
-            except Exception:
-                text = ""
-        if not text:
-            logger.info("No notification text provided. Skipping Telegram notification.")
-            return False
+        logger.info("No notification text provided. Skipping Telegram notification.")
+        return False
 
     msg_id_file = "tg_msg_id.txt"
     msg_id = None

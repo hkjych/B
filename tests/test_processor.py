@@ -263,5 +263,19 @@ class TestProcessor(unittest.TestCase):
         filtered = processor.filter_invalid(loopback_nodes)
         self.assertEqual(len(filtered), 0)
 
+    def test_processor_group_names_anti_collision(self):
+        from core.processor import GROUP_NAMES
+        self.assertIn("👑 私有节点", GROUP_NAMES)
+        self.assertIn("⚡ 自动选择 | 👑 私有节点", GROUP_NAMES)
+
+        processor = NodeProcessor()
+        # 节点原名与策略组完全重名
+        conflict_node = Node({"name": "👑 私有节点", "type": "ss", "server": "8.8.4.4", "port": 443, "cipher": "aes-128-gcm", "password": "p"})
+        processed = processor.process_all([conflict_node])
+        self.assertEqual(len(processed), 1)
+        # 必须被自动重命名，绝不能与 GROUP_NAMES 中的名字相同
+        self.assertNotIn(processed[0].name, GROUP_NAMES)
+        self.assertEqual(processed[0].name, "👑 私有节点 #1")
+
 if __name__ == "__main__":
     unittest.main()

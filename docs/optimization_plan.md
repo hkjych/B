@@ -189,16 +189,17 @@
   7. **`test_processor.py` 端口边界与回环过滤**：测试端口范围（1-65535、非整型过滤、字符串强转）与 IPv6 回环（`::1`, `[::1]`, `::`, `[::]`, `127.0.0.53`）精准过滤；
   8. 全工程测试用例总数达到 **83 项**，全量执行耗时仅 0.28s，全部通过。
 
-### 4.4 配置与 CI 优化
-| 改动项 | 修改方案 |
-|---|---|
-| `config.yaml` 测速组 | `lazy: true` 或 `interval: 300`，防移动端耗电 |
-| `config.yaml` 安全 | `external-controller` 补充 `secret` 占位注释 |
-| `config.yaml` 规则 | 补充 `DOMAIN-SUFFIX,x.com,🚀 选择代理` |
-| `fetch.yml` 触发优化 | 添加 `paths-ignore: ['README.md', 'list.*']` |
-| `notify.py` 死代码 | 移除 `tg_summary.txt` 读取分支 |
-| `processor.py` `GROUP_NAMES` | 补充 `👑 私有节点`、`⚡ 自动选择 \| 👑 私有节点` |
-| `processor.py` API 一致性 | `clean_and_rename` 增加 `return nodes` |
+### 4.4 配置与 CI 优化 [✅ 已完成]
+- **涉及文件**：`config.yaml`, `.github/workflows/fetch.yml`, `utils/notify.py`, `core/processor.py`, `tests/test_processor.py`
+- **完成情况**：
+  1. **测速组策略保持现状**：按用户意图保留模板现有的测速组 `interval: 60` 与 `lazy: false` 设定不变；
+  2. **`config.yaml` 控制器安全说明**：为 `external-controller: 127.0.0.1:9090` 增加 `secret` 访问密钥防护配置建议注释；
+  3. **`config.yaml` 补充 X (Twitter) 分流规则**：规则列表中补全 `DOMAIN-SUFFIX,x.com,🚀 选择代理`，确保访问 x.com 原生精准匹配代理；
+  4. **`fetch.yml` 触发范围优化**：添加 `paths-ignore: ['README.md', 'list.*', 'docs/**']`，避免仅文档或生成文件变动时无效消耗 GitHub Actions 免费额度；
+  5. **`notify.py` 遗留死代码清除**：彻底移除早期版本遗留的 `tg_summary.txt` 本地文件降级读取分支；
+  6. **`processor.py` 策略组防重名加固**：将 `👑 私有节点` 与 `⚡ 自动选择 | 👑 私有节点` 纳入 `GROUP_NAMES`，防止上游重名节点导致 Clash 内核循环引用崩溃；
+  7. **`processor.py` API 链式一致性**：`process_all` 中统一规范为 `nodes = self.clean_and_rename(nodes)` 显式接收；
+  8. 全量补充单元测试（测试总数达 **84 项**），全量测试全部通过。
 
 ---
 
