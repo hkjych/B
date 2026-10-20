@@ -31,3 +31,12 @@ CANONICAL_PROTOCOLS = {
     'trojan',
     'hysteria2',
 }
+
+# VMess 协议支持的加密算法白名单
+VMESS_ALLOWED_CIPHERS = {
+    'auto',
+    'aes-128-gcm',
+    'chacha20-poly1305',
+    'none',
+    'zero',
+}

@@ -26,23 +26,26 @@ settings:
         smart_pool_settings2 = (data2.get('settings') or {}).get('smart_pool', {}) or {}
         self.assertEqual(smart_pool_settings2, {})
 
-    def test_private_sources_formats_defense(self):
-        # 1. 验证 private_sources 为纯 List 格式时正常兼容
+    def test_normalize_private_sources(self):
+        from main import _normalize_private_sources
+
+        # 1. 验证 private_sources 为纯 List 格式时正常兼容并标记 is_private=True
         list_yaml = """
 - name: priv1
   url: https://example.com/p1
 - name: priv2
   url: https://example.com/p2
 """
-        lp_data = yaml.safe_load(list_yaml) or {}
-        lp_sources = lp_data if isinstance(lp_data, list) else (lp_data.get('sources') or [])
+        lp_sources = _normalize_private_sources(yaml.safe_load(list_yaml))
         self.assertEqual(len(lp_sources), 2)
         self.assertEqual(lp_sources[0]['name'], 'priv1')
+        self.assertTrue(lp_sources[0]['is_private'])
+        self.assertTrue(lp_sources[1]['is_private'])
 
-        # 2. 验证 private_sources 为空文件 (None) 时正常防崩
-        empty_data = yaml.safe_load("") or {}
-        lp_sources_empty = empty_data if isinstance(empty_data, list) else (empty_data.get('sources') or [])
-        self.assertEqual(lp_sources_empty, [])
+        # 2. 验证 private_sources 为空或 None 时正常防崩
+        self.assertEqual(_normalize_private_sources(yaml.safe_load("")), [])
+        self.assertEqual(_normalize_private_sources(None), [])
+        self.assertEqual(_normalize_private_sources("invalid string"), [])
 
         # 3. 验证 private_sources 为常规 Dict 格式
         dict_yaml = """
@@ -50,10 +53,10 @@ sources:
   - name: priv_dict
     url: https://example.com/dict
 """
-        dict_data = yaml.safe_load(dict_yaml) or {}
-        lp_sources_dict = dict_data if isinstance(dict_data, list) else (dict_data.get('sources') or [])
-        self.assertEqual(len(lp_sources_dict), 1)
-        self.assertEqual(lp_sources_dict[0]['name'], 'priv_dict')
+        dict_sources = _normalize_private_sources(yaml.safe_load(dict_yaml))
+        self.assertEqual(len(dict_sources), 1)
+        self.assertEqual(dict_sources[0]['name'], 'priv_dict')
+        self.assertTrue(dict_sources[0]['is_private'])
 
 if __name__ == '__main__':
     unittest.main()

@@ -11,8 +11,26 @@ from utils.stats import update_readme_all, prepare_source_stats
 from utils.notify import send_tg_notification
 from utils.logger import logger
 
+from typing import Any, Dict, List
+
 TEMPLATE_FILE = "config.yaml"
 OUTPUT_FILE = "list.meta.yml"
+
+def _normalize_private_sources(data: Any) -> List[Dict[str, Any]]:
+    """规范化私有源数据结构并自动注入 is_private=True 标记"""
+    if isinstance(data, list):
+        items = data
+    elif isinstance(data, dict):
+        items = data.get('sources') or []
+    else:
+        items = []
+
+    valid_items = []
+    for item in items:
+        if isinstance(item, dict):
+            item['is_private'] = True
+            valid_items.append(item)
+    return valid_items
 
 async def main():
     # 1. Load Sources from YAML
@@ -43,11 +61,7 @@ async def main():
     if os.path.exists(local_priv_file):
         try:
             with open(local_priv_file, 'r', encoding='utf-8') as f:
-                lp_data = yaml.safe_load(f) or {}
-                lp_sources = lp_data if isinstance(lp_data, list) else (lp_data.get('sources') or [])
-                for p in lp_sources:
-                    if isinstance(p, dict):
-                        p['is_private'] = True
+                lp_sources = _normalize_private_sources(yaml.safe_load(f))
                 sources_data.extend(lp_sources)
                 logger.info(f"Loaded {len(lp_sources)} private sources from local private_sources.yaml.")
         except Exception as e:
@@ -57,21 +71,9 @@ async def main():
     private_sources = os.getenv('PRIVATE_SOURCES')
     if private_sources:
         try:
-            private_data = yaml.safe_load(private_sources)
-            if isinstance(private_data, list):
-                for p in private_data:
-                    if isinstance(p, dict):
-                        p['is_private'] = True
-                sources_data.extend(private_data)
-                logger.info(f"Loaded {len(private_data)} private sources from Secrets.")
-            elif isinstance(private_data, dict):
-                p_sources = private_data.get('sources', [])
-                if isinstance(p_sources, list):
-                    for p in p_sources:
-                        if isinstance(p, dict):
-                            p['is_private'] = True
-                    sources_data.extend(p_sources)
-                    logger.info(f"Loaded {len(p_sources)} private sources from Secrets dict.")
+            sec_sources = _normalize_private_sources(yaml.safe_load(private_sources))
+            sources_data.extend(sec_sources)
+            logger.info(f"Loaded {len(sec_sources)} private sources from Secrets.")
         except Exception as e:
             logger.warning(f"Failed to parse PRIVATE_SOURCES: {e}")
             

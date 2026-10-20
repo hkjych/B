@@ -2,19 +2,13 @@ import json
 from typing import Dict, Any, Union, Optional
 from urllib.parse import urlparse, unquote, quote, parse_qsl
 from utils.common import b64decodes, b64decodes_safe, b64encodes
-from utils.constants import CANONICAL_PROTOCOLS, ALLOWED_TYPES
+from utils.constants import CANONICAL_PROTOCOLS, ALLOWED_TYPES, VMESS_ALLOWED_CIPHERS
 
 class Node:
     def __init__(self, data: Union[Dict[str, Any], str]):
         self.data: Dict[str, Any] = {}
         if isinstance(data, dict):
             self.data = data.copy()
-            raw_type = str(self.data.get('type') or 'unknown').strip().lower()
-            if raw_type == 'hy2':
-                raw_type = 'hysteria2'
-            self.data['type'] = raw_type
-            self.type = raw_type
-            self._clean_dict_fields()
         elif isinstance(data, str):
             self.load_url(data)
         
@@ -28,6 +22,10 @@ class Node:
             raw_type = 'hysteria2'
         self.data['type'] = raw_type
         self.type = raw_type
+
+        # 对字典输入的节点清洗深层特定字段
+        if isinstance(data, dict):
+            self._clean_dict_fields()
 
     @property
     def name(self):
@@ -65,7 +63,7 @@ class Node:
         # 1. Clean cipher for VMess
         if self.type == 'vmess':
             cipher = str(self.data.get('cipher') or '').strip().lower()
-            if cipher not in ('auto', 'aes-128-gcm', 'chacha20-poly1305', 'none', 'zero'):
+            if cipher not in VMESS_ALLOWED_CIPHERS:
                 cipher = 'auto'
             self.data['cipher'] = cipher
             
@@ -92,12 +90,22 @@ class Node:
             if self.type == 'vless':
                 self.data['servername'] = self.data['sni']
 
+    def _parse_reality_opts(self, params: Dict[str, str]):
+        """统一解析 Trojan / VLESS 等协议中的 Reality 混淆参数"""
+        if 'pbk' in params:
+            self.data['tls'] = True
+            ropts = {'public-key': params['pbk']}
+            sid = self._validate_short_id(params.get('sid') or params.get('shortId'))
+            if sid:
+                ropts['short-id'] = sid
+            self.data['reality-opts'] = ropts
+
     def _load_vmess(self, url: str, dt: str):
         try:
             content = b64decodes(dt)
             v = json.loads(content)
             cipher = str(v.get('scy') or '').strip().lower()
-            if cipher not in ('auto', 'aes-128-gcm', 'chacha20-poly1305', 'none', 'zero'):
+            if cipher not in VMESS_ALLOWED_CIPHERS:
                 cipher = 'auto'
             port_raw = v.get('port')
             port_val = int(port_raw) if port_raw not in (None, '') else 0
@@ -244,12 +252,7 @@ class Node:
                 if 'type' in params: self.data['network'] = params['type']
                 
                 # Reality options
-                if 'pbk' in params:
-                    self.data['tls'] = True
-                    self.data['reality-opts'] = {'public-key': params['pbk']}
-                    sid = self._validate_short_id(params.get('sid') or params.get('shortId'))
-                    if sid:
-                        self.data['reality-opts']['short-id'] = sid
+                self._parse_reality_opts(params)
         except Exception:
             pass
 
@@ -284,12 +287,7 @@ class Node:
                         self.data['grpc-opts'] = {'grpc-service-name': params['path']}
                 
                 # Reality options
-                if 'pbk' in params:
-                    self.data['tls'] = True
-                    self.data['reality-opts'] = {'public-key': params['pbk']}
-                    sid = self._validate_short_id(params.get('sid') or params.get('shortId'))
-                    if sid:
-                        self.data['reality-opts']['short-id'] = sid
+                self._parse_reality_opts(params)
         except Exception:
             pass
 

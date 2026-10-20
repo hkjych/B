@@ -11,23 +11,8 @@ from utils.logger import logger
 
 _MB_SPEED_RE = re.compile(r'(\d+\.?\d*)\s*mb/s', re.IGNORECASE)
 _KB_SPEED_RE = re.compile(r'(\d+\.?\d*)\s*kb/s', re.IGNORECASE)
-_YAML_SAFE_CONTROL_REGEX = re.compile(
-    r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\u200b-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufffe\uffff]'
-)
-
-
-def deep_sanitize(data: Any) -> Any:
-    """递归清理字典、列表或字符串中的非法控制字符与不可见字符。"""
-    if isinstance(data, str):
-        return _YAML_SAFE_CONTROL_REGEX.sub('', data)
-    elif isinstance(data, dict):
-        return {
-            (_YAML_SAFE_CONTROL_REGEX.sub('', k) if isinstance(k, str) else k): deep_sanitize(v)
-            for k, v in data.items()
-        }
-    elif isinstance(data, list):
-        return [deep_sanitize(item) for item in data]
-    return data
+# 引入控制字符深度清洗工具（保留 _YAML_SAFE_CONTROL_REGEX 与 deep_sanitize 导出兼容）
+from utils.common import deep_sanitize, YAML_SAFE_CONTROL_REGEX as _YAML_SAFE_CONTROL_REGEX
 
 
 _YAML_V3_LITERALS = {
@@ -225,7 +210,6 @@ class Generator:
             region_list_for_menu.append(others_group_name)
 
         # 私有节点专属策略组 (仅在包含私有节点时创建)
-        node_obj_map = {n.name: n for n in nodes}
         private_nodes = [node for node in nodes if node.data.get('_is_private')]
         has_private = len(private_nodes) > 0
         priv_groups = []
@@ -303,7 +287,7 @@ class Generator:
                 if key == 'CN': continue
                 candidates = [
                     n for n in region_nodes[key]
-                    if not is_china_node(n) and node_obj_map[n].data.get('_is_private')
+                    if not is_china_node(n) and name_to_node[n].data.get('_is_private')
                 ]
                 if not candidates: continue
                 candidates_sorted = sorted(candidates, key=get_node_quality_score, reverse=True)
@@ -315,7 +299,7 @@ class Generator:
             if others:
                 other_priv = [
                     n for n in others
-                    if not is_china_node(n) and node_obj_map[n].data.get('_is_private')
+                    if not is_china_node(n) and name_to_node[n].data.get('_is_private')
                 ]
                 if other_priv and priv_other_limit > 0:
                     other_sorted = sorted(other_priv, key=get_node_quality_score, reverse=True)
@@ -331,7 +315,7 @@ class Generator:
             if key == 'CN': continue
             candidates = [
                 n for n in region_nodes[key]
-                if not is_china_node(n) and not node_obj_map[n].data.get('_is_private')
+                if not is_china_node(n) and not name_to_node[n].data.get('_is_private')
             ]
             if not candidates: continue
             candidates_sorted = sorted(candidates, key=get_node_quality_score, reverse=True)
@@ -343,7 +327,7 @@ class Generator:
         if others:
             other_pub = [
                 n for n in others
-                if not is_china_node(n) and not node_obj_map[n].data.get('_is_private')
+                if not is_china_node(n) and not name_to_node[n].data.get('_is_private')
             ]
             if other_pub and pub_other_limit > 0:
                 other_sorted = sorted(other_pub, key=get_node_quality_score, reverse=True)
@@ -356,7 +340,7 @@ class Generator:
         # 4. 保底补充 (min_pool_size): 若节点过少，从公共海外全量节点按质量补齐
         pub_oversea_nodes = [
             n for n in node_names
-            if not is_china_node(n) and not node_obj_map[n].data.get('_is_private')
+            if not is_china_node(n) and not name_to_node[n].data.get('_is_private')
         ]
         min_limit_int = int(min_pool_size) if min_pool_size != float('inf') else len(pub_oversea_nodes)
         if min_limit_int > 0 and len(smart_pool_nodes) < min_limit_int and pub_oversea_nodes:
@@ -374,8 +358,8 @@ class Generator:
         # 5. 全局最大容量最终截断 (防测速风暴，优先保全私有节点)
         if max_pool_size != float('inf') and len(smart_pool_nodes) > int(max_pool_size):
             max_limit_int = int(max_pool_size)
-            priv_in_pool = [n for n in smart_pool_nodes if node_obj_map.get(n) and node_obj_map[n].data.get('_is_private')]
-            pub_in_pool = [n for n in smart_pool_nodes if not (node_obj_map.get(n) and node_obj_map[n].data.get('_is_private'))]
+            priv_in_pool = [n for n in smart_pool_nodes if name_to_node.get(n) and name_to_node[n].data.get('_is_private')]
+            pub_in_pool = [n for n in smart_pool_nodes if not (name_to_node.get(n) and name_to_node[n].data.get('_is_private'))]
             if len(priv_in_pool) >= max_limit_int:
                 smart_pool_nodes = priv_in_pool[:max_limit_int]
             else:
@@ -406,7 +390,7 @@ class Generator:
             final_template_groups.extend(priv_groups)
 
         config['proxy-groups'] = final_template_groups + dynamic_groups
-        config = deep_sanitize(config)
+        config = deep_sanitize(config, preserve_newlines=True)
 
         # 6. Save YAML (Clash Meta)
         with open(output_path, 'w', encoding='utf-8') as f:

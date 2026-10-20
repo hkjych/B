@@ -42,5 +42,25 @@ class TestCommon(unittest.TestCase):
         self.assertEqual(b64encodes(None), "")
         self.assertEqual(b64encodes(""), "")
 
+    def test_deep_sanitize_strict(self):
+        from utils.common import deep_sanitize
+        dirty = {
+            "name\x00": "test\x07node\r\n",
+            "list": ["item\x08", "clean", "\u200bhidden"]
+        }
+        cleaned = deep_sanitize(dirty, preserve_newlines=False)
+        self.assertEqual(cleaned["name"], "testnode")
+        self.assertEqual(cleaned["list"], ["item", "clean", "hidden"])
+
+    def test_deep_sanitize_preserve_newlines(self):
+        from utils.common import deep_sanitize
+        dirty = {
+            "yaml_text": "line1\nline2\r\n\tindented\x00bad",
+            "key\x07": "val"
+        }
+        cleaned = deep_sanitize(dirty, preserve_newlines=True)
+        self.assertEqual(cleaned["yaml_text"], "line1\nline2\r\n\tindentedbad")
+        self.assertEqual(cleaned["key"], "val")
+
 if __name__ == "__main__":
     unittest.main()

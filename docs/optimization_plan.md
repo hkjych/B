@@ -155,15 +155,16 @@
 
 ## 阶段四：🟢 P3 代码质量与性能优化
 
-### 4.1 消除代码重复
-| 重复项 | 修改方案 |
-|---|---|
-| `deep_sanitize` 两份 | 统一提取到 `utils/common.py`，提供严格/宽松两个模式参数 |
-| `parser.py` 类型归一化重复 | 移除 L11-15，保留 L24-29 |
-| VMess cipher 校验重复 | 集中在 `_clean_dict_fields` |
-| Reality 解析重复 | 提取 `_parse_reality_opts()` 辅助方法 |
-| `is_private` 标记重复 3 次 | 提取 `_normalize_private_sources(sources)` |
-| `node_obj_map` 重复构建 | 复用 `name_to_node`，删除 L226 |
+### 4.1 消除代码重复 [✅ 已完成]
+- **涉及文件**：`utils/common.py`, `utils/constants.py`, `core/parser.py`, `core/processor.py`, `core/generator.py`, `main.py`, `tests/test_common.py`, `tests/test_parser.py`, `tests/test_main.py`
+- **完成情况**：
+  1. **`deep_sanitize` 统一收敛**：在 `utils/common.py` 统一定义 `deep_sanitize(data, preserve_newlines=False)`，提供严格清洗模式与 YAML 换行保留模式（`preserve_newlines=True`），`core/processor.py` 与 `core/generator.py` 统一复用；
+  2. **`parser.py` 类型归一化去重**：移除 `Node.__init__` 在 `isinstance(dict)` 分支中的提前类型归一化与清洗，统一在末尾单点执行 `self.type` 归一化并执行 `self._clean_dict_fields()`；
+  3. **VMess cipher 白名单常量提取**：在 `utils/constants.py` 定义 `VMESS_ALLOWED_CIPHERS`，集中用于 `_clean_dict_fields` 与 `_load_vmess`；
+  4. **Reality 参数解析复用**：在 `core/parser.py` 提取 `_parse_reality_opts(params)` 辅助方法，Trojan 与 VLESS 协议统一调用；
+  5. **私有源解析与标记去重**：在 `main.py` 提取 `_normalize_private_sources(data)`，统一负责对 List/Dict 结构的解包并自动注入 `is_private=True` 标记；
+  6. **消除冗余字典映射构建**：在 `core/generator.py` 删除重复构建的 `node_obj_map = {n.name: n for n in nodes}`，全流程复用前面已建好的 `name_to_node`，节约 O(N) 内存与开销；
+  7. 全量补充单元测试（共 69 个测试），测试全部通过。
 
 ### 4.2 性能优化
 | 优化项 | 修改方案 |

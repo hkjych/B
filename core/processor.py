@@ -11,24 +11,8 @@ CLEAN_AD_REGEXES = [
     re.compile(r'(?i)(t\.me/\S+|https?://\S+)')
 ]
 
-# 清理 ANSI 终端转义、所有 C0/C1 控制字符、零宽字符、方向控制符、格式字符
-CONTROL_CHARS_REGEX = re.compile(
-    r'[\x00-\x1f\x7f-\x9f\u200b-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufffe\uffff]'
-)
-
-
-def deep_sanitize(data: Any) -> Any:
-    """递归清理字典、列表或字符串中的非法控制字符与不可见字符。"""
-    if isinstance(data, str):
-        return CONTROL_CHARS_REGEX.sub('', data)
-    elif isinstance(data, dict):
-        return {
-            (CONTROL_CHARS_REGEX.sub('', k) if isinstance(k, str) else k): deep_sanitize(v)
-            for k, v in data.items()
-        }
-    elif isinstance(data, list):
-        return [deep_sanitize(item) for item in data]
-    return data
+# 引入控制字符深度清洗工具（保留 CONTROL_CHARS_REGEX 与 deep_sanitize 导出兼容）
+from utils.common import deep_sanitize, STRICT_CONTROL_REGEX as CONTROL_CHARS_REGEX
 
 
 # 提示/公告/失效假节点过滤关键词

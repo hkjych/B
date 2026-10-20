@@ -263,6 +263,32 @@ class TestParser(unittest.TestCase):
         node_trojan_sni = Node(dict(trojan_dict, sni="trojan.example.com", servername=None))
         self.assertEqual(node_trojan.get_identity(), node_trojan_sni.get_identity())
 
+    def test_trojan_with_reality_opts(self):
+        url = "trojan://mypass@1.2.3.4:443?security=reality&sni=test.com&pbk=my_pub_key&sid=1234abcd#Trojan_Reality"
+        node = Node(url)
+        self.assertEqual(node.type, "trojan")
+        self.assertTrue(node.data.get("tls"))
+        ropts = node.data.get("reality-opts")
+        self.assertIsNotNone(ropts)
+        self.assertEqual(ropts["public-key"], "my_pub_key")
+        self.assertEqual(ropts["short-id"], "1234abcd")
+
+    def test_vmess_cipher_whitelist(self):
+        # 1. 字典输入非法 cipher 回退至 auto
+        node_bad = Node({"name": "bad", "type": "vmess", "cipher": "invalid-cipher-xyz"})
+        self.assertEqual(node_bad.data["cipher"], "auto")
+
+        # 2. 字典输入合法 cipher 保持原样
+        node_good = Node({"name": "good", "type": "vmess", "cipher": "chacha20-poly1305"})
+        self.assertEqual(node_good.data["cipher"], "chacha20-poly1305")
+
+        # 3. URL 输入非法 scy 回退至 auto
+        vmess_dict = {
+            "v": "2", "ps": "test", "add": "1.2.3.4", "port": "443",
+            "id": "a0000000-0000-0000-0000-000000000000", "scy": "unknown_crypto"
+        }
+        node_url = Node("vmess://" + b64encodes(json.dumps(vmess_dict)))
+        self.assertEqual(node_url.data["cipher"], "auto")
 
 if __name__ == "__main__":
     unittest.main()
