@@ -94,6 +94,20 @@ hysteria2://pwd@5.6.7.8:443#Hy2Node
 
         asyncio.run(run_test())
 
+    def test_parse_content_html_head_slice(self):
+        f = Fetcher()
+        # 大文本开头是 HTML 标签，后续带有很多普通字符
+        html_doc = "<!DOCTYPE html><html><body>" + "x" * 10000 + "</body></html>"
+        nodes = f.parse_content(html_doc)
+        self.assertEqual(len(nodes), 0)
+
+    def test_parse_content_skip_yaml_for_plain_urls(self):
+        f = Fetcher()
+        # 纯 URL 列表不包含 proxies: / Proxy: / payload: / server: 等，应直接进入 URL 逐行解析
+        content = "vmess://eyJhZGQiOiIxLjEuMS4xIiwicG9ydCI6NDQzLCJpZCI6ImEwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMCIsInBzIjoiVVJMMTEifQ\n"
+        nodes = f.parse_content(content)
+        self.assertEqual(len(nodes), 1)
+        self.assertEqual(nodes[0].name, "URL11")
 
 if __name__ == "__main__":
     unittest.main()

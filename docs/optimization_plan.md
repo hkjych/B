@@ -166,15 +166,16 @@
   6. **消除冗余字典映射构建**：在 `core/generator.py` 删除重复构建的 `node_obj_map = {n.name: n for n in nodes}`，全流程复用前面已建好的 `name_to_node`，节约 O(N) 内存与开销；
   7. 全量补充单元测试（共 69 个测试），测试全部通过。
 
-### 4.2 性能优化
-| 优化项 | 修改方案 |
-|---|---|
-| `get_identity()` 每次重算 | 添加 `_identity_cache` 属性缓存 |
-| `re.sub` 循环内编译 | 提升为模块级 `STRIP_PUNCT_REGEX` |
-| 未匹配地区二次扫描 | 始终设置 `node.data['_region']`（含 `None`） |
-| `content.upper()` 全文复制 | 改为 `content[:1000].upper()` 切片 |
-| 纯链接文本走 `yaml.safe_load` | 预检 `proxies:` 关键字再决定 |
-| `active_keys.sort()` 多余排序 | 删除，Python 3.7+ dict 已保序 |
+### 4.2 性能优化 [✅ 已完成]
+- **涉及文件**：`core/parser.py`, `core/processor.py`, `core/generator.py`, `core/fetcher.py`, `tests/test_parser.py`, `tests/test_processor.py`, `tests/test_fetcher.py`
+- **完成情况**：
+  1. **节点唯一指纹属性级缓存**：在 `Node` 类中引入 `_identity_cache` 属性，`get_identity()` 计算一次后自动缓存，大幅削减大批量去重时的重复字符串拼接与计算开销；
+  2. **循环内正则编译模块级提升**：将 `processor.py` 节点清洗中的孤立标点剥离正则提升为模块级预编译常量 `STRIP_PUNCT_REGEX`，免除循环内频繁正则 lookup 开销；
+  3. **未识别地区二次全库扫描消除**：`processor.py` 对未匹配地区的节点同样持久化 `node.data['_region'] = None`，`generator.py` 直接判断 `'_region' in node.data`，彻底避免下游几百甚至数千个未匹配地区节点再次触发全库关键词循环匹配；
+  4. **大文件 HTML 嗅探前缀切片优化**：`fetcher.py` 针对 HTML 网页检测改为 `content[:1000].upper()` 切片，避免万行大文件全文复制消耗多兆内存；
+  5. **纯链接 / Base64 跳过 YAML 冗余解析**：`fetcher.py` 增加 `proxies:`、`Proxy:`、`payload:` 及 `(server: and port:)` 快速预检，纯链接文本直接绕过耗时的 `yaml.safe_load`；
+  6. **移除多余的地区键排序**：删除 `core/generator.py` 中 `active_keys.sort()`，原生复用 Python 3.7+ 字典按 `REGIONS_DB` 既定插入顺序保留的稳定优先级；
+  7. 补充对应各项单元测试（测试总数提升至 74 项），全量测试全部通过。
 
 ### 4.3 补充单元测试
 | 新增测试文件 | 覆盖内容 |

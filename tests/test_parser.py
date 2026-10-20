@@ -290,6 +290,16 @@ class TestParser(unittest.TestCase):
         node_url = Node("vmess://" + b64encodes(json.dumps(vmess_dict)))
         self.assertEqual(node_url.data["cipher"], "auto")
 
+    def test_identity_cache(self):
+        node = Node({"name": "Test", "type": "ss", "server": "1.2.3.4", "port": 8388, "cipher": "aes-128-gcm", "password": "pwd"})
+        self.assertIsNone(node._identity_cache)
+        ident1 = node.get_identity()
+        self.assertIsNotNone(node._identity_cache)
+        self.assertEqual(node._identity_cache, ident1)
+        # 第二次调用直接走缓存
+        ident2 = node.get_identity()
+        self.assertEqual(ident1, ident2)
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -11,6 +11,9 @@ CLEAN_AD_REGEXES = [
     re.compile(r'(?i)(t\.me/\S+|https?://\S+)')
 ]
 
+# 清理广告剥离后残留的首尾孤立标点符号 (如 "|", "-", "_", " / " 等) 模块级预编译
+STRIP_PUNCT_REGEX = re.compile(r'^[\s\-_|/\\·:]+|[\s\-_|/\\·:]+$')
+
 # 引入控制字符深度清洗工具（保留 CONTROL_CHARS_REGEX 与 deep_sanitize 导出兼容）
 from utils.common import deep_sanitize, STRICT_CONTROL_REGEX as CONTROL_CHARS_REGEX
 
@@ -62,16 +65,16 @@ class NodeProcessor:
             name = name.replace(':', '-').replace('[', '').replace(']', '')
             name = name.replace('not found', '').replace('Unnamed', '').strip()
             # 清理广告剥离后残留的首尾孤立标点符号 (如 "|", "-", "_", " / " 等)
-            name = re.sub(r'^[\s\-_|/\\·:]+|[\s\-_|/\\·:]+$', '', name).strip()
+            name = STRIP_PUNCT_REGEX.sub('', name).strip()
 
             # 如果节点名称为空，使用保底名称
             if not name:
                 name = f"Node-{node.type}-{node.data.get('server', 'unknown')}"
 
-            # 2. 统一地区识别与国旗 Emoji 补全 (并持久化 _region 属性供下游直接使用)
+            # 2. 统一地区识别与国旗 Emoji 补全 (并持久化 _region 属性供下游直接使用，未匹配记为 None 避免二次全库遍历)
             region_code = match_region(name)
+            node.data['_region'] = region_code
             if region_code:
-                node.data['_region'] = region_code
                 flag = REGIONS_DB[region_code]['emoji']
                 if flag not in name:
                     name = f"{flag} {name}"
@@ -211,6 +214,7 @@ class NodeProcessor:
         # 确保去重指纹计算与回环检测完全不受隐形字符污染
         for node in nodes:
             node.data = deep_sanitize(node.data)
+            node._identity_cache = None
         nodes = self.filter_invalid(nodes)  # 1. 过滤无效节点
         nodes = self.deduplicate(nodes)     # 2. 精准去重
         self.clean_and_rename(nodes)        # 3. 清洗命名

@@ -208,6 +208,24 @@ class TestProcessor(unittest.TestCase):
         processed_evil = processor.process_all([node_evil])
         self.assertEqual(len(processed_evil), 0)
 
+    def test_strip_punct_regex(self):
+        from core.processor import STRIP_PUNCT_REGEX
+        test_cases = [
+            ("| - _ / hello world / _ - |", "hello world"),
+            ("···::node_name::···", "node_name"),
+            ("   leading and trailing   ", "leading and trailing"),
+            ("|/\\-·:_", "")
+        ]
+        for inp, expected in test_cases:
+            self.assertEqual(STRIP_PUNCT_REGEX.sub('', inp).strip(), expected)
+
+    def test_region_persistence_for_unmatched(self):
+        processor = NodeProcessor()
+        node_unmatched = Node({"name": "xyz_completely_random_node_123", "type": "ss", "server": "8.8.8.8", "port": 443, "cipher": "aes-128-gcm", "password": "p"})
+        processor.clean_and_rename([node_unmatched])
+        # 未匹配地区必须被明确持久化为 None，避免下游二次触发全量地区扫描
+        self.assertIn('_region', node_unmatched.data)
+        self.assertIsNone(node_unmatched.data['_region'])
 
 if __name__ == "__main__":
     unittest.main()

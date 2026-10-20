@@ -185,41 +185,50 @@ class Fetcher:
     def parse_content(self, content: str) -> List[Node]:
         nodes = []
 
-        # 0. 预检查：如果是 HTML 网页，直接跳过（防止报错）
-        if '<!DOCTYPE' in content.upper() or '<HTML' in content.upper():
+        # 0. 预检查：如果是 HTML 网页，直接跳过（防止报错，使用前 1000 字符切片避免全量大文本内存复制）
+        head_sample = content[:1000].upper()
+        if '<!DOCTYPE' in head_sample or '<HTML' in head_sample:
             logger.debug("  - Warning: Content looks like HTML/Webpage, skipping parser.")
             return []
 
         # 1. Try to parse as YAML (Clash style)
-        try:
-            data = yaml.safe_load(content)
-            if isinstance(data, dict):
-                plist = data.get("proxies") or data.get("Proxy")
-                if isinstance(plist, list):
-                    for p in plist:
+        # 性能优化：快速预检关键词，纯 URL 链接文本与 Base64 文本直接跳过 YAML 解析
+        is_potential_yaml = (
+            "proxies:" in content or 
+            "Proxy:" in content or 
+            "payload:" in content or 
+            ("server:" in content and "port:" in content)
+        )
+        if is_potential_yaml:
+            try:
+                data = yaml.safe_load(content)
+                if isinstance(data, dict):
+                    plist = data.get("proxies") or data.get("Proxy")
+                    if isinstance(plist, list):
+                        for p in plist:
+                            if isinstance(p, dict):
+                                nodes.append(Node(p))
+                elif isinstance(data, list):
+                    for p in data:
                         if isinstance(p, dict):
                             nodes.append(Node(p))
-            elif isinstance(data, list):
-                for p in data:
-                    if isinstance(p, dict):
-                        nodes.append(Node(p))
-        except Exception:
-            pass
+            except Exception:
+                pass
 
-        # 2. 如果 YAML 整体解析失败，尝试正则表达式提取保底
-        if not nodes:
-            found_lines = YAML_FALLBACK_PATTERN.findall(content)
-            for line in found_lines:
-                try:
-                    clean_line = line.replace('\n', ' ').replace('\r', '')
-                    p_data = yaml.safe_load(clean_line)
-                    if isinstance(p_data, dict) and 'server' in p_data:
-                        nodes.append(Node(p_data))
-                except Exception:
-                    continue
+            # 2. 如果 YAML 整体解析失败，尝试正则表达式提取保底
+            if not nodes:
+                found_lines = YAML_FALLBACK_PATTERN.findall(content)
+                for line in found_lines:
+                    try:
+                        clean_line = line.replace('\n', ' ').replace('\r', '')
+                        p_data = yaml.safe_load(clean_line)
+                        if isinstance(p_data, dict) and 'server' in p_data:
+                            nodes.append(Node(p_data))
+                    except Exception:
+                        continue
 
-        if nodes:
-            return nodes
+            if nodes:
+                return nodes
 
         # 3. Try to parse as Base64 (Standard V2Ray style)
         if len(content) > 10 and not any(s in content for s in ["server:", "port:", "type:"]):

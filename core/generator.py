@@ -100,21 +100,18 @@ class Generator:
         node_names = [node.name for node in nodes]
         for node in nodes:
             name = node.name
-            matched_key = node.data.get('_region') or match_region(name)
+            matched_key = node.data['_region'] if '_region' in node.data else match_region(name)
             if matched_key and matched_key in REGIONS_DB:
                 node_to_region[name] = matched_key
                 region_counts[matched_key] += 1
             else:
                 node_to_region[name] = 'OTHERS'
 
-        # 2. Filter Active Regions (只要节点数 > 0 即可独立建组)
+        # 2. Filter Active Regions (只要节点数 > 0 即可独立建组，自动保持 REGIONS_DB 插入序)
         active_keys = [
             k for k, count in region_counts.items() 
             if count > 0
         ]
-        # Sort active keys based on the ordering defined in REGIONS_DB
-        priority = list(REGIONS_DB.keys())
-        active_keys.sort(key=lambda x: priority.index(x) if x in priority else 99)
         
         region_nodes: Dict[str, List[str]] = {key: [] for key in active_keys}
         others: List[str] = []

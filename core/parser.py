@@ -27,6 +27,8 @@ class Node:
         if isinstance(data, dict):
             self._clean_dict_fields()
 
+        self._identity_cache: Optional[str] = None
+
     @property
     def name(self):
         return self.data.get('name', 'Unnamed')
@@ -428,6 +430,9 @@ class Node:
 
     def get_identity(self) -> str:
         """建立精确且不区分大小写的唯一标识 (Identity)，防止误删或漏去重"""
+        if getattr(self, '_identity_cache', None) is not None:
+            return self._identity_cache
+
         server = str(self.data.get('server', '')).strip().lower()
         port = str(self.data.get('port', '')).strip()
         t = str(self.type).strip().lower()
@@ -494,7 +499,9 @@ class Node:
             if obfs_pwd:
                 ident_parts.append(f"opwd:{obfs_pwd}")
 
-        return ":".join(ident_parts)
+        ident = ":".join(ident_parts)
+        self._identity_cache = ident
+        return ident
 
     def __hash__(self):
         return hash(self.get_identity())
