@@ -44,55 +44,66 @@ sources:
   # ==========================================
   # 👑 实测高可用源：上游已进行真实测速 / 连通性测试
   # ==========================================
+  - name: "🏆 huiwin NodeCollection (4h 自动测速清洗)"
+    url: "https://raw.githubusercontent.com/huiwin/NodeCollection/main/output/clash/latest.yaml"
+    note: "全协议覆盖，每 4 小时多线程连通与测速清洗，高存活率"
+
+  - name: "📡 anaer 精选池 (每日更新)"
+    url: "https://raw.githubusercontent.com/anaer/Sub/main/clash.yaml"
+    note: "每日高频自动同步，560+ 优质 VLESS/VMess/Trojan 活跃节点"
+
   - name: "📡 Zhangkai 系列 (speednodes)"
     url: "https://raw.githubusercontent.com/zhangkaiitugithub/passcro/main/speednodes.yaml"
-    note: "上游机器人每日定时实测，产出高稳定性 speednode 节点（主要覆盖罗马尼亚、荷兰、美国等）"
-
-  - name: "🔥🔥🔥 w1770946466 长期订阅"
-    url: "https://raw.githubusercontent.com/w1770946466/Auto_proxy/main/Long_term_subscription_num"
-    note: "包含 500+ 精选节点，自带实测下载速度 MB/s 标记"
+    note: "上游每日更新实测 speednode（白名单仅收录加密安全节点）"
 
   # ==========================================
-  # ⚡ 抗丢包协议专属源 (Hysteria2 / VLESS)
+  # ⚡ 抗丢包协议专属源 (Hysteria2 / VLESS / Trojan)
   # ==========================================
-  - name: "[长效备份] hy2 节点"
-    url: "https://raw.githubusercontent.com/Surfboardv2ray/TGParse/main/python/hy2"
-    note: "Hysteria2 UDP QUIC 极速协议"
-
   - name: "[长效备份] hysteria2 节点"
     url: "https://raw.githubusercontent.com/Surfboardv2ray/TGParse/main/python/hysteria2"
-    note: "Hysteria2 UDP QUIC 极速协议"
+    note: "Hysteria2 UDP QUIC 极速协议，抗丢包能力强"
 
+  - name: "[长效备份] hy2 节点"
+    url: "https://raw.githubusercontent.com/Surfboardv2ray/TGParse/main/python/hy2"
+    note: "Hysteria2 UDP QUIC 备用专线"
+
+  - name: "⚡ TGParse Trojan 专线"
+    url: "https://raw.githubusercontent.com/Surfboardv2ray/TGParse/main/python/trojan"
+    note: "每日高频实测抓取，高质量 Trojan 协议专线"
+
+  # ==========================================
+  # 🌐 活跃补充与覆盖池
+  # ==========================================
   - name: "⚡ Misaka Chromego 聚合池"
     url: "https://raw.githubusercontent.com/Misaka-blog/chromego_merge/main/sub/merged_proxies_new.yaml"
-    note: "高质量 Hysteria2 / VLESS 节点"
-
-  # ==========================================
-  # 🌐 备用与覆盖池
-  # ==========================================
-  - name: "🔥🔥🔥 日抛机场系列"
-    url: "https://raw.githubusercontent.com/ripaojiedian/freenode/main/sub"
-    note: "产量高，覆盖多地区"
-
-  - name: "📡 Huibq 聚合"
-    url: "https://raw.githubusercontent.com/Huibq/TrojanLinks/master/links/vmess"
-    note: "Trojan/VLESS 补充"
+    note: "每日自动聚合多协议节点补充"
 
   - name: "📱 Pawdroid 免费节点库"
     url: "https://raw.githubusercontent.com/Pawdroid/Free-servers/main/sub"
-    note: "移动端精选"
+    note: "每 6 小时自动更新的移动端精选节点"
 
   - name: "📡 shaoyouvip 每日实测"
     url: "https://raw.githubusercontent.com/shaoyouvip/free/main/base64.txt"
     note: "每日实测测速更新 (纯净 VLESS)"
 
-  - name: "🏆 huiwin NodeCollection (4h 自动测速清洗)"
-    url: "https://raw.githubusercontent.com/huiwin/NodeCollection/main/output/clash/latest.yaml"
-    note: "全协议覆盖，每 4 小时多线程连通与测速清洗"
-
   # ==========================================
   # 💤 备选休眠源 (默认关闭，需要时设 enabled: true)
   # ==========================================
+  - name: "🔥🔥🔥 w1770946466 长期订阅"
+    url: "https://raw.githubusercontent.com/w1770946466/Auto_proxy/main/Long_term_subscription_num"
+    enabled: false
+    note: "【停用】上游已于 2024-03-20 停更超过 2 年半，堆积 500+ 失效死节点"
+
+  - name: "📡 Huibq 聚合"
+    url: "https://raw.githubusercontent.com/Huibq/TrojanLinks/master/links/vmess"
+    enabled: false
+    note: "【停用】上游已于 2025-09-19 停更超过 1 年"
+
+  - name: "🔥🔥🔥 日抛机场系列"
+    url: "https://raw.githubusercontent.com/ripaojiedian/freenode/main/sub"
+    enabled: false
+    note: "【停用】上游停更超 3 周，日抛试用账号已 100% 过期失效"
+
   - name: "🔥🔥🔥 ClashGitHub"
     url: "https://clashgithub.com/wp-content/uploads/rss/%Y%m%d.txt"
     enabled: false
