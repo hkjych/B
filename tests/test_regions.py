@@ -69,5 +69,12 @@ class TestRegions(unittest.TestCase):
         self.assertIsNone(match_region("MAIN CHAIN NODE"))
         self.assertIsNone(match_region("STATION ESCAPE"))
 
+    def test_new_zealand_matching(self):
+        self.assertEqual(match_region("新西兰+V2CROSS.COM"), "NZ")
+        self.assertEqual(match_region("🇳🇿 New Zealand 01"), "NZ")
+        self.assertEqual(match_region("NZ-Auckland-01"), "NZ")
+        self.assertEqual(match_region("基督城 01"), "NZ")
+        self.assertEqual(match_region("Wellington Server"), "NZ")
+
 if __name__ == '__main__':
     unittest.main()

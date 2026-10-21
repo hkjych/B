@@ -19,6 +19,7 @@ REGIONS_DB: Dict[str, Dict[str, Any]] = {
     'IN': {'name': '印度', 'emoji': '🇮🇳', 'keywords': ['IN', 'India', 'IND', 'Mumbai']},
     'TR': {'name': '土耳其', 'emoji': '🇹🇷', 'keywords': ['TR', 'Turkey', 'TUR', 'Istanbul', '伊斯坦布尔']},
     'AU': {'name': '澳大利亚', 'emoji': '🇦🇺', 'keywords': ['AU', 'Australia', 'AUS', 'Sydney', 'Melbourne', '悉尼', '墨尔本', 'Brisbane', '布里斯班', 'Perth', '珀斯']},
+    'NZ': {'name': '新西兰', 'emoji': '🇳🇿', 'keywords': ['NZ', 'New Zealand', 'NewZealand', 'NZL', 'Auckland', '奥克兰', 'Wellington', '惠灵顿', 'Christchurch', '基督城']},
     'TH': {'name': '泰国', 'emoji': '🇹🇭', 'keywords': ['TH', 'Thailand', 'Bangkok', '曼谷']},
     'PH': {'name': '菲律宾', 'emoji': '🇵🇭', 'keywords': ['PH', 'Philippines', 'Manila', '马尼拉']},
     'MY': {'name': '马来西亚', 'emoji': '🇲🇾', 'keywords': ['MY', 'Malaysia', 'Kuala Lumpur', '吉隆坡']},
