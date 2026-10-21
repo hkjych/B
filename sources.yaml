@@ -63,10 +63,6 @@ sources:
     url: "https://raw.githubusercontent.com/Surfboardv2ray/TGParse/main/python/hysteria2"
     note: "Hysteria2 UDP QUIC 极速协议，抗丢包能力强"
 
-  - name: "[长效备份] hy2 节点"
-    url: "https://raw.githubusercontent.com/Surfboardv2ray/TGParse/main/python/hy2"
-    note: "Hysteria2 UDP QUIC 备用专线"
-
   - name: "⚡ TGParse Trojan 专线"
     url: "https://raw.githubusercontent.com/Surfboardv2ray/TGParse/main/python/trojan"
     note: "每日高频实测抓取，高质量 Trojan 协议专线"
@@ -89,6 +85,11 @@ sources:
   # ==========================================
   # 💤 备选休眠源 (默认关闭，需要时设 enabled: true)
   # ==========================================
+  - name: "[长效备份] hy2 节点"
+    url: "https://raw.githubusercontent.com/Surfboardv2ray/TGParse/main/python/hy2"
+    enabled: false
+    note: "【停用】仅3个节点且更新滞后，已被同仓库的 [长效备份] hysteria2 节点完整覆盖"
+
   - name: "🔥🔥🔥 w1770946466 长期订阅"
     url: "https://raw.githubusercontent.com/w1770946466/Auto_proxy/main/Long_term_subscription_num"
     enabled: false
