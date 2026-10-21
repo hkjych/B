@@ -93,34 +93,54 @@ _LONG_KEYWORDS.sort(key=lambda x: len(x[0]), reverse=True)
 
 def match_region(name: str) -> Optional[str]:
     """
-    统一的地区识别算法，分 4 级瀑布流精准匹配：
-    1. Emoji 国旗优先匹配 (最精准)
-    2. 中文名称与城市匹配 (按长度降序)
-    3. 英文全称与完整城市名匹配 (>=4字符，按长度降序，杜绝子串碰撞)
-    4. 2/3 字母短代码边界安全匹配 (排除英文单词与标号冲突)
+    统一的地区识别算法（右侧优先 / 落地优先）：
+    找出名称中出现的所有地区标识（国旗 Emoji、中文名与城市、英文全称、2/3字母短代码），
+    取在字符串中最靠右（出现位置最大，即落地出口端）的匹配项。
+    对于单国家节点，该位置为唯一位置，100% 自然兼容；对于中转多国家节点，精准匹配落地出口。
     """
     if not name:
         return None
 
-    # Level 1: Emoji
+    best_key = None
+    best_pos = -1
+    best_len = 0
+
+    # Level 1: Emoji 国旗扫描（记录最靠右的 Emoji）
     for emoji, key in _EMOJI_MAP.items():
-        if emoji in name:
-            return key
+        pos = name.rfind(emoji)
+        if pos != -1:
+            if pos > best_pos or (pos == best_pos and len(emoji) > best_len):
+                best_pos = pos
+                best_len = len(emoji)
+                best_key = key
 
-    # Level 2: 中文名及中文城市
+    # Level 2: 中文名及中文城市扫描
     for cname, key in _CHINESE_KEYWORDS:
-        if cname in name:
-            return key
+        pos = name.rfind(cname)
+        if pos != -1:
+            if pos > best_pos or (pos == best_pos and len(cname) > best_len):
+                best_pos = pos
+                best_len = len(cname)
+                best_key = key
 
-    # Level 3: 英文全称及完整城市名 (长度降序，解决 Austria 误判 AUS 等问题)
+    # Level 3: 英文全称及完整城市名 (>=4 字符，不区分大小写)
     name_lower = name.lower()
     for kw_lower, key in _LONG_KEYWORDS:
-        if kw_lower in name_lower:
-            return key
+        pos = name_lower.rfind(kw_lower)
+        if pos != -1:
+            if pos > best_pos or (pos == best_pos and len(kw_lower) > best_len):
+                best_pos = pos
+                best_len = len(kw_lower)
+                best_key = key
 
     # Level 4: 2/3 字母短代码边界安全匹配
     for pat, key in _CODE_PATTERNS:
-        if pat.search(name):
-            return key
+        for m in pat.finditer(name):
+            pos = m.start()
+            mlen = m.end() - m.start()
+            if pos > best_pos or (pos == best_pos and mlen > best_len):
+                best_pos = pos
+                best_len = mlen
+                best_key = key
 
-    return None
+    return best_key

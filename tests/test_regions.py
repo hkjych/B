@@ -76,5 +76,16 @@ class TestRegions(unittest.TestCase):
         self.assertEqual(match_region("基督城 01"), "NZ")
         self.assertEqual(match_region("Wellington Server"), "NZ")
 
+    def test_relay_rightmost_priority(self):
+        # 1. 经典中转格式：🇦🇺 澳大利亚 -> 🇫🇮 芬兰 (应精准识别为落地国 芬兰 FI)
+        self.assertEqual(match_region("🇦🇺_AU_澳大利亚->🇫🇮_FI_芬兰"), "FI")
+        self.assertEqual(match_region("AU_Sydney -> FI_Helsinki"), "FI")
+        
+        # 2. 中文与符号中转格式
+        self.assertEqual(match_region("广港->香港 01"), "HK")
+        self.assertEqual(match_region("深圳-中转-日本"), "JP")
+        self.assertEqual(match_region("🇨🇳 广州 -> 🇭🇰 香港 02"), "HK")
+        self.assertEqual(match_region("上海CN2 | 美国硅谷 05"), "US")
+
 if __name__ == '__main__':
     unittest.main()
