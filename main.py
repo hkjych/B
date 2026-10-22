@@ -136,7 +136,7 @@ async def main():
         
         # 5. Update README (统一更新顶部徽章、地区统计表与各源贡献度明细)
         try:
-            source_stats = prepare_source_stats(raw_source_results, processor=processor)
+            source_stats = prepare_source_stats(raw_source_results, final_nodes=processed_nodes)
             update_readme_all(gen_stats, source_stats, now=now)
         except Exception as e:
             logger.warning(f"Failed to update README stats table: {e}")

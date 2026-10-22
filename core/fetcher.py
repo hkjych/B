@@ -277,6 +277,9 @@ async def parallel_fetch(source_infos: List[Dict[str, Any]], timeout: float = 10
                     'is_private': is_priv
                 })
             else:
+                for n in res:
+                    if '_source' not in n.data:
+                        n.data['_source'] = s_name
                 all_nodes.extend(res)
                 source_results.append({
                     'name': s_name,

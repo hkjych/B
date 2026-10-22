@@ -72,30 +72,50 @@ class TestStats(unittest.TestCase):
             self.assertIn("Source A", content)
 
     def test_prepare_source_stats_single_private(self):
+        class DummyNode:
+            def __init__(self, name, source):
+                self.data = {'name': name, '_source': source}
+
         raw_results = [
-            {'name': 'Public Source 1', 'nodes': [{'name': 'n1'}, {'name': 'n2'}], 'is_private': False},
+            {'name': 'Public Source 1', 'nodes': [{'name': 'n1'}], 'is_private': False},
             {'name': 'Secret Airport (user@abc.com)', 'nodes': [{'name': 'p1'}], 'is_private': True},
         ]
-        # Test without processor (raw length)
-        stats = prepare_source_stats(raw_results, processor=None)
+        final_nodes = [
+            DummyNode('n1', 'Public Source 1'),
+            DummyNode('p1', 'Secret Airport (user@abc.com)')
+        ]
+        stats = prepare_source_stats(raw_results, final_nodes=final_nodes)
         self.assertEqual(len(stats), 2)
         self.assertEqual(stats[0]['name'], 'Public Source 1')
-        self.assertEqual(stats[0]['valid_count'], 2)
+        self.assertEqual(stats[0]['valid_count'], 1)
         # Private source must be masked
         self.assertEqual(stats[1]['name'], '👑 我的私有订阅')
         self.assertEqual(stats[1]['valid_count'], 1)
 
     def test_prepare_source_stats_multiple_private(self):
+        class DummyNode:
+            def __init__(self, name, source):
+                self.data = {'name': name, '_source': source}
+
         raw_results = [
             {'name': 'Secret Airport A', 'nodes': [{'name': 'p1'}], 'is_private': True},
             {'name': 'Public Source 1', 'nodes': [{'name': 'n1'}], 'is_private': False},
             {'name': 'Secret VPS B', 'nodes': [{'name': 'p2'}, {'name': 'p3'}], 'is_private': True},
         ]
-        stats = prepare_source_stats(raw_results, processor=None)
+        final_nodes = [
+            DummyNode('p1', 'Secret Airport A'),
+            DummyNode('n1', 'Public Source 1'),
+            DummyNode('p2', 'Secret VPS B'),
+            DummyNode('p3', 'Secret VPS B'),
+        ]
+        stats = prepare_source_stats(raw_results, final_nodes=final_nodes)
         self.assertEqual(len(stats), 3)
         self.assertEqual(stats[0]['name'], '👑 我的私有订阅 01')
+        self.assertEqual(stats[0]['valid_count'], 1)
         self.assertEqual(stats[1]['name'], 'Public Source 1')
+        self.assertEqual(stats[1]['valid_count'], 1)
         self.assertEqual(stats[2]['name'], '👑 我的私有订阅 02')
+        self.assertEqual(stats[2]['valid_count'], 2)
 
     def test_build_source_stats_markdown_safe_escaping(self):
         source_results = [
@@ -129,6 +149,26 @@ class TestStats(unittest.TestCase):
         self.assertNotIn("2026-10-19", badges)
         self.assertIn("Valid_Nodes-500-orange.svg", badges)
         self.assertIn("Active_Sources-8-blue.svg", badges)
+
+    def test_prepare_source_stats_scheme_a_dedup_attribution(self):
+        class DummyNode:
+            def __init__(self, name, source):
+                self.data = {'name': name, '_source': source}
+
+        raw_results = [
+            {'name': 'Source A', 'nodes': [DummyNode('n1', 'Source A'), DummyNode('n2_dup', 'Source A')], 'is_private': False},
+            {'name': 'Source B', 'nodes': [DummyNode('n3', 'Source B')], 'is_private': False},
+        ]
+        final_nodes = [DummyNode('n1', 'Source A'), DummyNode('n3', 'Source B')]
+        stats = prepare_source_stats(raw_results, final_nodes=final_nodes)
+        self.assertEqual(stats[0]['name'], 'Source A')
+        self.assertEqual(stats[0]['valid_count'], 1)
+        self.assertEqual(stats[1]['name'], 'Source B')
+        self.assertEqual(stats[1]['valid_count'], 1)
+
+        table = build_source_stats_markdown(stats)
+        self.assertIn("去重后总计", table)
+        self.assertIn("**2** 个", table)
 
 
 if __name__ == "__main__":

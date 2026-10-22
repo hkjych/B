@@ -1,6 +1,7 @@
 import datetime
 import os
 import re
+from collections import Counter
 from typing import List, Dict, Any, Optional, Tuple
 from utils.regions import REGION_NAMES
 
@@ -56,31 +57,37 @@ def build_overview_markdown(
 
 def prepare_source_stats(
     raw_source_results: List[Dict[str, Any]],
-    processor: Optional[Any] = None,
+    final_nodes: List[Any],
 ) -> List[Dict[str, Any]]:
     """
     清洗各源统计数据，并对私有源进行安全脱敏重命名：
     - 单私有源：重命名为 '👑 我的私有订阅'
     - 多私有源：重命名为 '👑 我的私有订阅 01'、'👑 我的私有订阅 02'
-    - 针对每个源，通过 processor.filter_invalid 统计真实有效节点数量
+    - 严格基于 final_nodes (最终去重入库节点) 统计各源实际保留的独立有效节点数与真实占比
     """
     source_stats = []
     total_privates = sum(1 for item in raw_source_results if item.get('is_private'))
     priv_counter = 0
 
+    final_source_counts = Counter(
+        node.data.get('_source')
+        for node in final_nodes
+        if hasattr(node, 'data') and node.data.get('_source')
+    )
+
     for item in raw_source_results:
-        raw_nodes = item.get('nodes', [])
-        valid_nodes = processor.filter_invalid(raw_nodes) if processor else raw_nodes
         s_name = item.get('name', '未命名源')
         is_priv = bool(item.get('is_private', False))
 
         if is_priv:
             priv_counter += 1
-            s_name = f"👑 我的私有订阅 {priv_counter:02d}" if total_privates > 1 else "👑 我的私有订阅"
+            display_name = f"👑 我的私有订阅 {priv_counter:02d}" if total_privates > 1 else "👑 我的私有订阅"
+        else:
+            display_name = s_name
 
         source_stats.append({
-            'name': s_name,
-            'valid_count': len(valid_nodes),
+            'name': display_name,
+            'valid_count': final_source_counts.get(s_name, 0),
             'is_private': is_priv,
         })
     return source_stats
@@ -115,7 +122,7 @@ def build_source_stats_markdown(source_results: List[Dict[str, Any]], now: Optio
         lines.append(f"| {idx} | `{safe_name}` | **{v_count}** 个 | `{pct:.2f}%` |")
 
     lines.extend([
-        f"| **-** | **总计 (包含跨源重合)** | **{total_valid}** 个 | `100.00%` |",
+        f"| **-** | **去重后总计** | **{total_valid}** 个 | `100.00%` |",
         "",
         "</div>",
         "",
