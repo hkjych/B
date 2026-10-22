@@ -3,6 +3,7 @@ from collections import defaultdict
 from typing import List, Set, Dict, Any
 from core.parser import Node
 from utils.regions import REGIONS_DB, match_region
+from utils.ciphers import normalize_ss_cipher, is_valid_ss_cipher
 from utils.logger import logger
 
 # 清理广告与多余链接的预编译正则
@@ -70,6 +71,10 @@ class NodeProcessor:
             # 如果节点名称为空，使用保底名称
             if not name:
                 name = f"Node-{node.type}-{node.data.get('server', 'unknown')}"
+
+            # Shadowsocks 加密算法统一规范化
+            if node.type == 'ss' and 'cipher' in node.data:
+                node.data['cipher'] = normalize_ss_cipher(node.data.get('cipher'))
 
             # 2. 统一地区识别与国旗 Emoji 补全 (并持久化 _region 属性供下游直接使用，未匹配记为 None 避免二次全库遍历)
             region_code = match_region(name)
@@ -143,6 +148,10 @@ class NodeProcessor:
                 elif n_type == 'ss':
                     if not n_data.get('cipher') or not n_data.get('password'):
                         continue
+                    norm_cipher = normalize_ss_cipher(n_data.get('cipher'))
+                    if not is_valid_ss_cipher(norm_cipher):
+                        continue
+                    n_data['cipher'] = norm_cipher
                     # 校验 Shadowsocks plugin
                     plugin = n_data.get('plugin')
                     if plugin:

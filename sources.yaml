@@ -60,13 +60,6 @@ sources:
     url: "https://raw.githubusercontent.com/shaoyouvip/free/main/base64.txt"
     note: "每日实测测速更新 (纯净 VLESS)"
 
-  # ==========================================
-  # ⚡ 抗丢包协议专属源 (Hysteria2)
-  # ==========================================
-  - name: "[长效备份] hysteria2 节点"
-    url: "https://raw.githubusercontent.com/Surfboardv2ray/TGParse/main/python/hysteria2"
-    note: "Hysteria2 UDP QUIC 极速协议，抗丢包能力强"
-
   - name: "📡 Zhangkai 系列 (speednodes)"
     url: "https://raw.githubusercontent.com/zhangkaiitugithub/passcro/main/speednodes.yaml"
     note: "上游每日更新实测 speednode（白名单仅收录加密安全节点）"
@@ -89,10 +82,10 @@ sources:
     enabled: false
     note: "【停用】公开频道大规模聚合，死节点率高，易导致客户端测速超时"
 
-  - name: "[长效备份] hy2 节点"
-    url: "https://raw.githubusercontent.com/Surfboardv2ray/TGParse/main/python/hy2"
+  - name: "[长效备份] hysteria2 节点"
+    url: "https://raw.githubusercontent.com/Surfboardv2ray/TGParse/main/python/hysteria2"
     enabled: false
-    note: "【停用】仅3个节点且更新滞后，已被同仓库的 [长效备份] hysteria2 节点完整覆盖"
+    note: "【停用】TGParse 爬取的 Telegram 公用节点，国内超时(Timeout)死节点率极高"
 
   - name: "🔥🔥🔥 w1770946466 长期订阅"
     url: "https://raw.githubusercontent.com/w1770946466/Auto_proxy/main/Long_term_subscription_num"

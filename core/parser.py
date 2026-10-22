@@ -3,6 +3,7 @@ from typing import Dict, Any, Union, Optional
 from urllib.parse import urlparse, unquote, quote, parse_qsl
 from utils.common import b64decodes, b64decodes_safe, b64encodes
 from utils.constants import CANONICAL_PROTOCOLS, ALLOWED_TYPES, VMESS_ALLOWED_CIPHERS
+from utils.ciphers import normalize_ss_cipher
 
 class Node:
     def __init__(self, data: Union[Dict[str, Any], str]):
@@ -22,6 +23,10 @@ class Node:
             raw_type = 'hysteria2'
         self.data['type'] = raw_type
         self.type = raw_type
+
+        # Standardize Shadowsocks cipher
+        if self.type == 'ss' and 'cipher' in self.data:
+            self.data['cipher'] = normalize_ss_cipher(self.data.get('cipher'))
 
         # 对字典输入的节点清洗深层特定字段
         if isinstance(data, dict):
@@ -184,7 +189,7 @@ class Node:
                         'type': 'ss',
                         'server': server,
                         'port': port_val,
-                        'cipher': cipher,
+                        'cipher': normalize_ss_cipher(cipher),
                         'password': password,
                         'udp': True
                     })
