@@ -76,6 +76,17 @@ class TestRegions(unittest.TestCase):
         self.assertEqual(match_region("基督城 01"), "NZ")
         self.assertEqual(match_region("Wellington Server"), "NZ")
 
+    def test_estonia_matching(self):
+        self.assertEqual(match_region("🇪🇪EE_2|3.0MB/s"), "EE")
+        self.assertEqual(match_region("EE_2|3.0MB/s"), "EE")
+        self.assertEqual(match_region("爱沙尼亚 01"), "EE")
+        self.assertEqual(match_region("Estonia-Tallinn-01"), "EE")
+        self.assertEqual(match_region("塔林 01"), "EE")
+        self.assertEqual(match_region("EST-01"), "EE")
+        # 边界与小写安全检查（避免将单词中的 ee 误判为国家码）
+        self.assertIsNone(match_region("Free Node 01"))
+        self.assertIsNone(match_region("Coffee Shop Server"))
+
     def test_relay_rightmost_priority(self):
         # 1. 经典中转格式：🇦🇺 澳大利亚 -> 🇫🇮 芬兰 (应精准识别为落地国 芬兰 FI)
         self.assertEqual(match_region("🇦🇺_AU_澳大利亚->🇫🇮_FI_芬兰"), "FI")

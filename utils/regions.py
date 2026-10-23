@@ -50,6 +50,7 @@ REGIONS_DB: Dict[str, Dict[str, Any]] = {
     'BG': {'name': '保加利亚', 'emoji': '🇧🇬', 'keywords': ['BG', 'Bulgaria', 'BGR', 'Sofia']},
     'ZA': {'name': '南非', 'emoji': '🇿🇦', 'keywords': ['ZA', 'South Africa', 'ZAF']},
     'BZ': {'name': '伯利兹', 'emoji': '🇧🇿', 'keywords': ['BZ', 'Belize']},
+    'EE': {'name': '爱沙尼亚', 'emoji': '🇪🇪', 'keywords': ['EE', 'Estonia', 'EST', 'Tallinn', '塔林']},
 }
 
 # 预编译多级匹配规则（模块级单例缓存，极速匹配）
@@ -66,7 +67,7 @@ _LONG_KEYWORDS: List[Tuple[str, str]] = []
 _CODE_PATTERNS: List[Tuple[re.Pattern, str]] = []
 
 # 容易与英语高频单词/缩写发生冲突的短代码（必须严格大写匹配，且 ID 排除 ID: 或 ID= 等标号）
-AMBIGUOUS_CODES = {'NO', 'ID', 'IN', 'IT', 'AT', 'US', 'MY', 'CAN'}
+AMBIGUOUS_CODES = {'NO', 'ID', 'IN', 'IT', 'AT', 'US', 'MY', 'CAN', 'EE'}
 
 for key, info in REGIONS_DB.items():
     if info.get('name'):
