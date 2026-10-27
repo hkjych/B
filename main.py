@@ -102,7 +102,9 @@ async def main():
                 'name': name,
                 'url': url,
                 'filters': filters,
-                'is_private': bool(s.get('is_private', False))
+                'is_private': bool(s.get('is_private', False)),
+                # 仅在确认特定固定源证书异常且接受风险时配置 false；默认严格校验证书
+                'verify_tls': s.get('verify_tls', True) is not False
             })
     
     if not source_infos:
@@ -118,11 +120,21 @@ async def main():
     # 2. Parallel fetching (单次全异步并发抓取，同时获取各源节点明细)
     all_raw_nodes, raw_source_results = await parallel_fetch(source_infos)
     raw_count = len(all_raw_nodes)
-    logger.info(f"Fetched {raw_count} raw nodes.")
+    successful_sources = sum(1 for result in raw_source_results if result.get("ok"))
+    failed_sources = [result for result in raw_source_results if not result.get("ok")]
+    for result in failed_sources:
+        logger.warning(f"Source failed ({result.get('name')}): {result.get('error')}")
+    logger.info(f"Fetched {raw_count} raw nodes from {successful_sources}/{active_source_count} sources.")
+    if successful_sources == 0 or raw_count == 0:
+        logger.error("No source returned parsable nodes; keeping existing generated subscriptions unchanged.")
+        return
     
     # 3. Processing (Deduplicate, Clean Names, Emoji Flags)
     processor = NodeProcessor()
     processed_nodes = processor.process_all(all_raw_nodes)
+    if not processed_nodes:
+        logger.error("All fetched nodes were rejected during validation; keeping existing generated subscriptions unchanged.")
+        return
     
     # 4. Generate Output (Merge with template)
     if not os.path.exists(TEMPLATE_FILE):

@@ -58,5 +58,37 @@ sources:
         self.assertEqual(dict_sources[0]['name'], 'priv_dict')
         self.assertTrue(dict_sources[0]['is_private'])
 
+    def test_main_keeps_existing_output_when_all_nodes_are_invalid(self):
+        import asyncio
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import AsyncMock, patch
+        from core.parser import Node
+        import main
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            (root / "sources.yaml").write_text("sources:\n  - name: test\n    url: https://example.com/sub\n", encoding="utf-8")
+            output = root / "list.meta.yml"
+            output.write_text("existing-subscription", encoding="utf-8")
+            invalid_node = Node({
+                "name": "invalid-local", "type": "ss", "server": "127.0.0.1", "port": 443,
+                "cipher": "aes-128-gcm", "password": "secret"
+            })
+            async def run_test():
+                import os
+                old_cwd = os.getcwd()
+                os.chdir(root)
+                try:
+                    with patch("main.parallel_fetch", new=AsyncMock(return_value=([invalid_node], [{"name": "test", "nodes": [invalid_node], "is_private": False, "ok": True}]))), \
+                         patch("main.TEMPLATE_FILE", str(Path(__file__).resolve().parents[1] / "config.yaml")), \
+                         patch("main.OUTPUT_FILE", str(output)):
+                        await main.main()
+                finally:
+                    os.chdir(old_cwd)
+
+            asyncio.run(run_test())
+            self.assertEqual(output.read_text(encoding="utf-8"), "existing-subscription")
+
 if __name__ == '__main__':
     unittest.main()

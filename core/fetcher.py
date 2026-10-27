@@ -1,6 +1,9 @@
 import asyncio
 import os
 import re
+import ipaddress
+import socket
+from urllib.parse import urljoin, urlparse
 from typing import List, Dict, Any, Optional, Tuple
 import httpx
 import yaml
@@ -28,6 +31,11 @@ DEFAULT_HEADERS = {
     "Upgrade-Insecure-Requests": "1"
 }
 
+MAX_RESPONSE_BYTES = 5 * 1024 * 1024
+MAX_RECURSIVE_URLS = 100
+MAX_RECURSION_DEPTH = 1
+MAX_REDIRECTS = 5
+
 EXCLUDE_RECURSIVE_KEYWORDS = (
     'github.com/peasoft', 'license', 'readme', 'rules', 't.me/',
     'twitter.com', 'youtube.com', 'facebook.com', 't.cn', 'j.mp'
@@ -42,6 +50,7 @@ class Fetcher:
         self.headers = DEFAULT_HEADERS
         self._external_client = client is not None
         self.client = client
+        self._insecure_client: Optional[httpx.AsyncClient] = None
 
     async def __aenter__(self):
         if self.client is None:
@@ -49,9 +58,9 @@ class Fetcher:
             limits = httpx.Limits(max_keepalive_connections=20, max_connections=30)
             self.client = httpx.AsyncClient(
                 headers=self.headers,
-                verify=False,
-                follow_redirects=True,
-                trust_env=True,
+                verify=True,
+                follow_redirects=False,
+                trust_env=False,
                 limits=limits,
                 timeout=self.req_timeout
             )
@@ -61,14 +70,64 @@ class Fetcher:
         if not self._external_client and self.client:
             await self.client.aclose()
             self.client = None
+        if self._insecure_client:
+            await self._insecure_client.aclose()
+            self._insecure_client = None
 
-    async def fetch_nodes(self, url: str, filters: Optional[Dict[str, Any]] = None, is_private: bool = False) -> List[Node]:
-        return await self._fetch_nodes_internal(url, filters, is_private=is_private)
+    async def fetch_nodes(self, url: str, filters: Optional[Dict[str, Any]] = None, is_private: bool = False, verify_tls: bool = True, recursion_depth: int = 0) -> List[Node]:
+        return await self._fetch_nodes_internal(url, filters, is_private=is_private, verify_tls=verify_tls, recursion_depth=recursion_depth)
 
-    async def _fetch_nodes_internal(self, url: str, filters: Optional[Dict[str, Any]] = None, is_private: bool = False) -> List[Node]:
+    async def _validate_fetch_url(self, url: str) -> None:
+        parsed = urlparse(url)
+        if parsed.scheme.lower() != "https" or not parsed.hostname or parsed.username or parsed.password:
+            raise ValueError(f"Rejected fetch URL: only credential-free HTTPS URLs are allowed ({url!r})")
+        host = parsed.hostname.rstrip(".").lower()
+        try:
+            ip = ipaddress.ip_address(host)
+            addresses = [ip]
+        except ValueError:
+            loop = asyncio.get_running_loop()
+            infos = await loop.getaddrinfo(host, parsed.port or 443, type=socket.SOCK_STREAM)
+            addresses = [ipaddress.ip_address(info[4][0].split("%", 1)[0]) for info in infos]
+        if not addresses or any(not address.is_global for address in addresses):
+            raise ValueError(f"Rejected fetch URL resolving to non-public address: {host}")
+
+    async def _request_limited(self, client: httpx.AsyncClient, url: str) -> bytes:
+        current_url = url
+        for redirect_count in range(MAX_REDIRECTS + 1):
+            await self._validate_fetch_url(current_url)
+            async with self.semaphore:
+                async with client.stream("GET", current_url, timeout=self.req_timeout, follow_redirects=False) as response:
+                    if response.status_code in (301, 302, 303, 307, 308):
+                        location = response.headers.get("location")
+                        if not location or redirect_count >= MAX_REDIRECTS:
+                            raise ValueError("Redirect limit exceeded or missing Location header")
+                        current_url = urljoin(current_url, location)
+                        continue
+                    if response.status_code != 200:
+                        logger.debug(f"HTTP {response.status_code} on {current_url}")
+                        return b""
+                    declared_length = response.headers.get("content-length")
+                    if declared_length and int(declared_length) > MAX_RESPONSE_BYTES:
+                        raise ValueError(f"Response exceeded {MAX_RESPONSE_BYTES} byte limit")
+                    chunks = []
+                    total = 0
+                    async for chunk in response.aiter_bytes():
+                        total += len(chunk)
+                        if total > MAX_RESPONSE_BYTES:
+                            raise ValueError(f"Response exceeded {MAX_RESPONSE_BYTES} byte limit")
+                        chunks.append(chunk)
+                    return b"".join(chunks)
+        raise ValueError("Redirect limit exceeded")
+
+    async def _fetch_nodes_internal(self, url: str, filters: Optional[Dict[str, Any]] = None, is_private: bool = False, verify_tls: bool = True, recursion_depth: int = 0) -> List[Node]:
         is_recursive = url.startswith('*')
         if is_recursive:
             url = url[1:]
+
+        if recursion_depth > MAX_RECURSION_DEPTH:
+            logger.warning(f"Recursive fetch depth limit reached for {url}")
+            return []
 
         # 更加健壮的 GitHub 镜像生成逻辑
         targets = [url]
@@ -96,20 +155,27 @@ class Fetcher:
 
         # 若非本地文件，则执行网络镜像请求
         if not content:
-            client = self.client
+            client = self.client if verify_tls else self._insecure_client
             close_client_after = False
             if client is None:
-                client = httpx.AsyncClient(headers=self.headers, verify=False, follow_redirects=True, timeout=self.req_timeout)
-                close_client_after = True
+                client = httpx.AsyncClient(headers=self.headers, verify=verify_tls, follow_redirects=False, trust_env=False, timeout=self.req_timeout)
+                if verify_tls and self.client is None:
+                    self.client = client
+                elif not verify_tls:
+                    self._insecure_client = client
+                else:
+                    close_client_after = True
 
+            request_errors = []
             try:
                 for target_url in targets:
                     try:
                         logger.debug(f"Fetching: {target_url}")
-                        async with self.semaphore:
-                            response = await client.get(target_url, timeout=self.req_timeout)
-                        if response.status_code == 200:
-                            text = response.content.decode('utf-8-sig', errors='ignore')
+                        if not verify_tls and self._external_client:
+                            raise ValueError("verify_tls=false is unsupported with an externally supplied client")
+                        payload = await self._request_limited(client, target_url)
+                        if payload:
+                            text = payload.decode('utf-8-sig', errors='ignore')
                             # 识别假 200（如反代 404/502 HTML、Cloudflare 质询页）
                             head_sample = text[:500].upper()
                             if '<!DOCTYPE' in head_sample or '<HTML' in head_sample:
@@ -118,8 +184,9 @@ class Fetcher:
                             content = text
                             break
                         else:
-                            logger.debug(f"  - Error HTTP {response.status_code} on {target_url}")
+                            logger.debug(f"  - Empty response for {target_url}")
                     except Exception as e:
+                        request_errors.append(f"{target_url}: {type(e).__name__}: {e}")
                         logger.debug(f"  - Request Exception on {target_url}: {e}")
             finally:
                 if close_client_after:
@@ -127,7 +194,8 @@ class Fetcher:
 
         if not content:
             logger.warning(f"  - Failed to get any content for {url}")
-            return []
+            detail = "; ".join(request_errors[-3:]) if 'request_errors' in locals() and request_errors else "no successful response"
+            raise RuntimeError(f"No content retrieved from source: {url} ({detail})")
 
         if is_recursive:
             found_urls = URL_EXTRACT_PATTERN.findall(content)
@@ -139,14 +207,20 @@ class Fetcher:
                 sub_urls.append(u)
 
             if sub_urls:
-                sub_urls = list(dict.fromkeys(sub_urls))
-                logger.info(f"  - Found {len(sub_urls)} sub-urls in {url}")
-                tasks = [self.fetch_nodes(u, filters, is_private=is_private) for u in sub_urls]
+                sub_urls = list(dict.fromkeys(sub_urls))[:MAX_RECURSIVE_URLS]
+                logger.info(f"  - Fetching up to {len(sub_urls)} sub-urls in {url}")
+                tasks = [self.fetch_nodes(u, filters, is_private=is_private, verify_tls=verify_tls, recursion_depth=recursion_depth + 1) for u in sub_urls]
                 results = await asyncio.gather(*tasks, return_exceptions=True)
                 all_nodes = []
+                failures = 0
                 for res in results:
                     if isinstance(res, list):
                         all_nodes.extend(res)
+                    else:
+                        failures += 1
+                        logger.warning(f"Recursive child fetch failed: {type(res).__name__}: {res}")
+                if failures == len(results):
+                    raise RuntimeError(f"All recursive child fetches failed for {url}")
                 return all_nodes
 
         # 解析内容
@@ -212,8 +286,8 @@ class Fetcher:
                     for p in data:
                         if isinstance(p, dict):
                             nodes.append(Node(p))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"YAML parsing failed: {type(e).__name__}: {e}")
 
             # 2. 如果 YAML 整体解析失败，尝试正则表达式提取保底
             if not nodes:
@@ -224,7 +298,8 @@ class Fetcher:
                         p_data = yaml.safe_load(clean_line)
                         if isinstance(p_data, dict) and 'server' in p_data:
                             nodes.append(Node(p_data))
-                    except Exception:
+                    except Exception as e:
+                        logger.debug(f"YAML fallback row skipped: {type(e).__name__}: {e}")
                         continue
 
             if nodes:
@@ -242,8 +317,8 @@ class Fetcher:
                             line_s = line.strip()
                             if line_s.lower().startswith(ALLOWED_PROTOCOLS):
                                 nodes.append(Node(line_s))
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Base64 subscription parsing failed: {type(e).__name__}: {e}")
 
         if nodes:
             return nodes
@@ -262,7 +337,7 @@ async def parallel_fetch(source_infos: List[Dict[str, Any]], timeout: float = 10
     使用全局连接池高效并行抓取，返回 (全量节点列表, 按源归类的明细列表)
     """
     async with Fetcher(timeout=timeout, connect_timeout=connect_timeout) as fetcher:
-        tasks = [fetcher.fetch_nodes(info['url'], info.get('filters'), is_private=info.get('is_private', False)) for info in source_infos]
+        tasks = [fetcher.fetch_nodes(info['url'], info.get('filters'), is_private=info.get('is_private', False), verify_tls=info.get('verify_tls', True)) for info in source_infos]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         all_nodes = []
@@ -274,7 +349,9 @@ async def parallel_fetch(source_infos: List[Dict[str, Any]], timeout: float = 10
                 source_results.append({
                     'name': s_name,
                     'nodes': [],
-                    'is_private': is_priv
+                    'is_private': is_priv,
+                    'ok': False,
+                    'error': f'{type(res).__name__}: {res}' if isinstance(res, Exception) else 'No proxy nodes parsed'
                 })
             else:
                 for n in res:
@@ -284,6 +361,8 @@ async def parallel_fetch(source_infos: List[Dict[str, Any]], timeout: float = 10
                 source_results.append({
                     'name': s_name,
                     'nodes': res,
-                    'is_private': is_priv
+                    'is_private': is_priv,
+                    'ok': True,
+                    'error': None
                 })
         return all_nodes, source_results

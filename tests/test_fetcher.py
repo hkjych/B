@@ -68,28 +68,37 @@ hysteria2://pwd@5.6.7.8:443#Hy2Node
 
     def test_recursive_fetch_semaphore_no_deadlock(self):
         import asyncio
-        from unittest.mock import AsyncMock, MagicMock
+        from unittest.mock import AsyncMock, MagicMock, patch
 
         async def run_test():
+            from contextlib import asynccontextmanager
             mock_client = MagicMock()
             async def mock_get(url, **kwargs):
                 resp = MagicMock()
                 resp.status_code = 200
+                resp.headers = {}
                 if "parent" in str(url):
-                    resp.content = b"https://example.com/sub1\nhttps://example.com/sub2"
+                    body = b"https://example.com/sub1\nhttps://example.com/sub2"
                 elif "sub1" in str(url):
-                    resp.content = b"vmess://eyJhZGQiOiIxLjEuMS4xIiwicG9ydCI6NDQzLCJpZCI6ImEwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMCIsInBzIjoiU3ViMSJ9"
+                    body = b"vmess://eyJhZGQiOiIxLjEuMS4xIiwicG9ydCI6NDQzLCJpZCI6ImEwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMCIsInBzIjoiU3ViMSJ9"
                 elif "sub2" in str(url):
-                    resp.content = b"vmess://eyJhZGQiOiIyLjIuMi4yIiwicG9ydCI6NDQzLCJpZCI6ImEwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMCIsInBzIjoiU3ViMiJ9"
+                    body = b"vmess://eyJhZGQiOiIyLjIuMi4yIiwicG9ydCI6NDQzLCJpZCI6ImEwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMCIsInBzIjoiU3ViMiJ9"
                 else:
                     resp.status_code = 404
-                    resp.content = b""
+                    body = b""
+                async def chunks():
+                    yield body
+                resp.aiter_bytes = chunks
                 return resp
 
-            mock_client.get = AsyncMock(side_effect=mock_get)
-            # max_concurrent=1: 以前如果外层占住信号量，递归子任务获取信号量时必定死锁卡死
-            async with Fetcher(max_concurrent=1, client=mock_client) as f:
-                nodes = await asyncio.wait_for(f.fetch_nodes("*https://example.com/parent"), timeout=2.0)
+            @asynccontextmanager
+            async def mock_stream(method, url, **kwargs):
+                yield await mock_get(url, **kwargs)
+            mock_client.stream = mock_stream
+            # 模拟 DNS 通过，以便专注测试抓取及信号量行为
+            with patch.object(Fetcher, '_validate_fetch_url', new=AsyncMock()):
+                async with Fetcher(max_concurrent=1, client=mock_client) as f:
+                    nodes = await asyncio.wait_for(f.fetch_nodes("*https://example.com/parent"), timeout=2.0)
                 self.assertEqual(len(nodes), 2)
                 self.assertEqual({n.name for n in nodes}, {"Sub1", "Sub2"})
 
@@ -112,28 +121,145 @@ hysteria2://pwd@5.6.7.8:443#Hy2Node
 
     def test_fetcher_mirror_fallback(self):
         import asyncio
-        from unittest.mock import AsyncMock, MagicMock
+        from unittest.mock import AsyncMock, MagicMock, patch
 
         async def run_test():
+            from contextlib import asynccontextmanager
             mock_client = MagicMock()
             attempts = []
             async def mock_get(url, **kwargs):
                 attempts.append(str(url))
                 resp = MagicMock()
+                resp.headers = {}
                 if "raw.githubusercontent.com" in str(url):
                     resp.status_code = 500
-                    resp.content = b"Internal Server Error"
+                    body = b"Internal Server Error"
                 else:
                     resp.status_code = 200
-                    resp.content = b"vmess://eyJhZGQiOiIxLjEuMS4xIiwicG9ydCI6NDQzLCJpZCI6ImEwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMCIsInBzIjoiTWlycm9yTm9kZSJ9"
+                    body = b"vmess://eyJhZGQiOiIxLjEuMS4xIiwicG9ydCI6NDQzLCJpZCI6ImEwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMCIsInBzIjoiTWlycm9yTm9kZSJ9"
+                async def chunks():
+                    yield body
+                resp.aiter_bytes = chunks
                 return resp
 
-            mock_client.get = AsyncMock(side_effect=mock_get)
-            async with Fetcher(client=mock_client) as f:
-                nodes = await f.fetch_nodes("https://raw.githubusercontent.com/user/repo/master/sub.txt")
+            @asynccontextmanager
+            async def mock_stream(method, url, **kwargs):
+                yield await mock_get(url, **kwargs)
+            mock_client.stream = mock_stream
+            with patch.object(Fetcher, '_validate_fetch_url', new=AsyncMock()):
+                async with Fetcher(client=mock_client) as f:
+                    nodes = await f.fetch_nodes("https://raw.githubusercontent.com/user/repo/master/sub.txt")
                 self.assertEqual(len(nodes), 1)
                 self.assertEqual(nodes[0].name, "MirrorNode")
                 self.assertGreaterEqual(len(attempts), 2)
+
+        asyncio.run(run_test())
+
+    def test_fetch_url_rejects_non_https_and_private_addresses(self):
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+
+        async def run_test():
+            f = Fetcher()
+            with self.assertRaisesRegex(ValueError, "HTTPS"):
+                await f._validate_fetch_url("http://example.com/sub")
+
+            with patch("core.fetcher.asyncio.get_running_loop") as get_loop:
+                loop = get_loop.return_value
+                loop.getaddrinfo = AsyncMock(return_value=[(None, None, None, None, ("10.2.3.4", 443))])
+                with self.assertRaisesRegex(ValueError, "non-public"):
+                    await f._validate_fetch_url("https://private.example/sub")
+
+        asyncio.run(run_test())
+
+    def test_redirect_target_is_validated(self):
+        import asyncio
+        from contextlib import asynccontextmanager
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        async def run_test():
+            client = MagicMock()
+            response = MagicMock(status_code=302, headers={"location": "http://127.0.0.1/admin"})
+            @asynccontextmanager
+            async def stream(method, url, **kwargs):
+                yield response
+            client.stream = stream
+            f = Fetcher(client=client)
+            async def validate(url):
+                if url.startswith("http://"):
+                    raise ValueError("only credential-free HTTPS URLs are allowed")
+            with patch.object(f, "_validate_fetch_url", new=AsyncMock(side_effect=validate)) as validate_mock:
+                with self.assertRaisesRegex(ValueError, "HTTPS"):
+                    await f._request_limited(client, "https://public.example/start")
+                self.assertEqual(validate_mock.await_count, 2)
+                self.assertEqual(validate_mock.await_args_list[1].args[0], "http://127.0.0.1/admin")
+
+        asyncio.run(run_test())
+
+    def test_response_size_limit_enforced_while_streaming(self):
+        import asyncio
+        from contextlib import asynccontextmanager
+        from unittest.mock import MagicMock, patch
+        from core.fetcher import MAX_RESPONSE_BYTES
+
+        async def run_test():
+            client = MagicMock()
+            response = MagicMock(status_code=200, headers={})
+            async def chunks():
+                yield b"x" * (MAX_RESPONSE_BYTES + 1)
+            response.aiter_bytes = chunks
+            @asynccontextmanager
+            async def stream(method, url, **kwargs):
+                yield response
+            client.stream = stream
+            f = Fetcher(client=client)
+            with patch.object(f, "_validate_fetch_url", new=AsyncMock()):
+                with self.assertRaisesRegex(ValueError, "byte limit"):
+                    await f._request_limited(client, "https://public.example/sub")
+
+        from unittest.mock import AsyncMock
+        asyncio.run(run_test())
+
+    def test_recursive_url_count_is_capped(self):
+        import asyncio
+        from unittest.mock import AsyncMock
+        from core.fetcher import MAX_RECURSIVE_URLS
+
+        async def run_test():
+            f = Fetcher()
+            f._request_limited = AsyncMock(return_value="\n".join(f"https://public.example/{i}" for i in range(MAX_RECURSIVE_URLS + 25)).encode())
+            f.fetch_nodes = AsyncMock(return_value=[])
+            await f._fetch_nodes_internal("*https://public.example/index")
+            self.assertEqual(f.fetch_nodes.await_count, MAX_RECURSIVE_URLS)
+
+        asyncio.run(run_test())
+
+    def test_recursion_depth_limit_stops_before_request(self):
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        async def run_test():
+            f = Fetcher()
+            f._request_limited = AsyncMock(side_effect=AssertionError("request should not happen"))
+            nodes = await f.fetch_nodes("https://public.example/sub", recursion_depth=2)
+            self.assertEqual(nodes, [])
+            f._request_limited.assert_not_awaited()
+
+        asyncio.run(run_test())
+
+    def test_tls_verification_setting_passed_per_source(self):
+        import asyncio
+        from unittest.mock import patch
+
+        async def run_test():
+            infos = [{"name": "exception-source", "url": "https://public.example/sub", "verify_tls": False}]
+            async def fake_fetch(url, *args, **kwargs):
+                self.assertFalse(kwargs["verify_tls"])
+                return [Node({"name": "n", "type": "ss", "server": "1.1.1.1", "port": 443, "cipher": "aes-128-gcm", "password": "p"})]
+            with patch.object(Fetcher, "fetch_nodes", side_effect=fake_fetch):
+                nodes, results = await parallel_fetch(infos)
+            self.assertEqual(len(nodes), 1)
+            self.assertTrue(results[0]["ok"])
 
         asyncio.run(run_test())
 
